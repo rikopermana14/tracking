@@ -56,8 +56,6 @@ class LoginController extends Controller
     {
         if ($user->hasRole('admin')) {
             return redirect()->route('admin.page');
-        }elseif($user->hasRole('vessel')) {
-            return redirect()->route('vessel.page');
         }elseif($user->hasRole('purchasing')){
             return redirect()->route('purchasing.page');
         }

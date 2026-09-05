@@ -60,15 +60,25 @@
             </p>
           </a>
         </li>
-        <li class="nav-item">
+        <!-- <li class="nav-item">
           <a href="/vdr" class="nav-link">
             <i class="nav-icon fas fa-list"></i>
             <p>
               Vessel Daily Report
             </p>
           </a>
+        </li> -->
+        @if (auth()->user()->hasRole('admin')|| auth()->user()->hasRole('purchasing'))
+        <li class="nav-item">
+          <a href="/history" class="nav-link">
+            <i class="nav-icon fas fa-cart-plus"></i>
+            <p>
+              Historical Rute Vessel
+            </p>
+          </a>
         </li>
-        @if (auth()->user()->hasRole('admin'))
+        @endif
+        <!-- @if (auth()->user()->hasRole('admin'))
         <li class="nav-item">
           <a href="/vessel" class="nav-link">
             <i class="nav-icon fas fa-ship"></i>
@@ -87,7 +97,7 @@
             </p>
           </a>
         </li>
-        @endif
+        @endif -->
         @if (auth()->user()->hasRole('admin'))
         <li class="nav-item">
           <a href="/user" class="nav-link">
@@ -98,7 +108,7 @@
           </a>
         </li>
         @endif
-        @if (auth()->user()->hasRole('admin'))
+        <!-- @if (auth()->user()->hasRole('admin'))
         <li class="nav-item">
           <a href="/report/report" class="nav-link">
             <i class="nav-icon fas fa-book-open"></i>
@@ -107,7 +117,7 @@
             </p>
           </a>
         </li>
-        @endif
+        @endif -->
       </ul>
     </nav>
     <!-- /.sidebar-menu -->

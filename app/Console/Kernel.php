@@ -15,9 +15,10 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule)
     {
-        // $schedule->command('inspire')->hourly();
+        $schedule->command('sync:vessel-muliatrack')->everyFiveMinutes();
     }
-
+    
+// php artisan sync:vessel-muliatrack
     /**
      * Register the commands for the application.
      *
