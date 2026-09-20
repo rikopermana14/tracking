@@ -5,7 +5,7 @@
     <div class="row justify-content-center">
         <div class="col-md-8">
             <div class="card">
-                <div class="card-header card-header-custom"><center>Aplication Vessel Daily Report PT Logindo Samudramakmur TBK</center></div>
+                <div class="card-header card-header-custom"><center>Aplication Vessel Monitoring PT Logindo Samudramakmur TBK</center></div>
 
                 <div class="card-body">
                     <div class="login-container">

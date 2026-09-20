@@ -5,7 +5,7 @@
         <div class="container-fluid">
             <div class="row mb-2">
                 <div class="col-sm-6">
-                    <h1>Vessel Track Report</h1>
+                    <h1>Historical Route Vessel</h1>
                 </div>
                 <div class="col-sm-6">
                     <ol class="breadcrumb float-sm-right">
@@ -60,6 +60,21 @@
     </select>
 </div>
 
+ <!-- Filter Nama Kapal -->
+<div class="form-group mb-2 mr-3">
+    <label for="status" class="mr-2">Status:</label>
+
+    <select id="status"
+            name="status"
+            class="form-control">
+
+        <option value="">
+            Semua Status
+        </option>
+
+    </select>
+</div>
+
                     <button type="button" onclick="filterByDate()" class="btn btn-primary mb-2">
                         Filter
                     </button>
@@ -69,7 +84,51 @@
     </div>
      <!-- Map -->
      <div id="map"></div>
+<!-- ==========================================
+     DAFTAR SEMUA KAPAL
+     ========================================== -->
+<div class="historical-vessel-section">
 
+    <div class="historical-vessel-header">
+        <h4>
+            <i class="fas fa-ship"></i>
+            Vessel AIS
+        </h4>
+
+        <div class="historical-legend">
+
+            <span>
+                <span class="historical-dot moving"></span>
+                Moving
+            </span>
+
+            <span>
+                <span class="historical-dot idling"></span>
+                Idling
+            </span>
+
+            <span>
+                <span class="historical-dot inactive"></span>
+                Inactive
+            </span>
+
+        </div>
+    </div>
+
+    <div
+        id="historical-vessel-container"
+        class="row">
+        
+        <div class="col-12 text-center">
+            <div class="historical-loading">
+                <i class="fas fa-spinner fa-spin"></i>
+                Loading AIS...
+            </div>
+        </div>
+
+    </div>
+
+</div>
 <!-- Legend -->
 <div id="legend">
     <h6><b>Keterangan:</b></h6>
@@ -101,8 +160,197 @@
 </div>
 
 <div class="container">
-   
-        <style>
+
+    <div id="distance"></div>
+    <div id="destination-distance"></div>
+    <div id="estimated-time"></div>
+    <div id="average-speed"></div>
+
+   <!-- ==========================================
+     TABLE HASIL DATA
+     RESPONSIVE + DATATABLE
+     ========================================== -->
+<div class="mt-3">
+
+    <h5>Hasil Data Filter</h5>
+
+    <div class="table-responsive">
+
+        <table
+            class="table table-bordered table-striped table-hover"
+            id="result1"
+            style="width:100%;"
+        >
+
+            <thead>
+                <tr>
+                    <th>No</th>
+                    <th>Date Time (UTC)</th>
+                    <th>Name</th>
+                    <th>Latitude</th>
+                    <th>Longitude</th>
+                    <th>Speed (knots)</th>
+                    <th>Mileage</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                <!-- DataTables mengisi data melalui JavaScript -->
+            </tbody>
+
+        </table>
+
+    </div>
+
+</div>
+
+<style>
+            /* =========================================================
+   HISTORICAL VESSEL SECTION
+   ========================================================= */
+
+.historical-vessel-section {
+    margin-top: 10px;
+    margin-bottom: 15px;
+}
+
+.historical-vessel-header {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 8px;
+}
+
+.historical-vessel-header h4 {
+    margin: 0;
+    font-size: 18px;
+}
+
+.historical-legend {
+    display: flex;
+    gap: 15px;
+    font-size: 13px;
+}
+
+.historical-legend span {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.historical-dot {
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.historical-dot.moving {
+    background: #00c853;
+}
+
+.historical-dot.idling {
+    background: #f44336;
+}
+
+.historical-dot.inactive {
+    background: #757575;
+}
+
+
+/* =========================================================
+   CARD KAPAL
+   ========================================================= */
+
+.historical-vessel-card {
+    min-height: 88px;
+    border-radius: 7px;
+    padding: 6px;
+    margin-bottom: 8px;
+    color: white;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+    transition: 0.2s;
+    cursor: pointer;
+}
+
+.historical-vessel-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 12px rgba(0,0,0,0.20);
+}
+
+
+/* STATUS */
+
+.historical-vessel-card.moving {
+    background: #00c853;
+}
+
+.historical-vessel-card.idling {
+    background: #f44336;
+}
+
+.historical-vessel-card.inactive {
+    background: #757575;
+}
+
+.historical-vessel-card.unknown {
+    background: #757575;
+}
+
+
+/* CONTENT */
+
+.historical-vessel-icon {
+    text-align: center;
+    font-size: 24px;
+    line-height: 24px;
+    margin-bottom: 2px;
+}
+
+.historical-vessel-name {
+    text-align: center;
+    font-size: 11px;
+    font-weight: 700;
+    margin-bottom: 2px;
+}
+
+.historical-vessel-status {
+    text-align: center;
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    margin-bottom: 2px;
+}
+
+.historical-vessel-info {
+    text-align: center;
+    font-size: 8px;
+    line-height: 1.3;
+}
+
+.historical-vessel-location {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 4px;
+    font-size: 8px;
+}
+
+.historical-vessel-location-text {
+    max-width: 90%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.historical-loading,
+.historical-empty {
+    padding: 20px;
+    color: #777;
+    text-align: center;
+}
     #map { 
         height: 500px; 
         margin-top: 20px; 
@@ -128,38 +376,32 @@
         text-align: center; 
         margin-right: 5px; 
     }
-</style>
-    <div id="distance"></div>
-    <div id="destination-distance"></div>
-    <div id="estimated-time"></div>
-    <div id="average-speed"></div>
-
-    <!-- Table -->
-    <div class="mt-3">
-        <h5>Hasil Data Filter</h5>
-        <table class="table table-bordered table-striped" id="result1">
-            <thead>
-                <tr>
-                    <th>No</th>
-                    <th>Date Time (UTC)</th>
-                    <th>Name</th>
-                    <th>Latitude</th>
-                    <th>Longitude</th>
-                    <th>Speed (knots)</th>
-                    <th>mileage</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody>
-                <!-- diisi via JS -->
-            </tbody>
-        </table>
-    </div>
-</div>
-
-<style>
     #map { height: 250px; margin-top: 20px; }
     #filter-form { margin: 20px; position: relative; }
+    /* =========================================================
+   RESPONSIVE DATATABLE
+   ========================================================= */
+
+.table-responsive {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+/*
+ * ID result1 TETAP dipakai DataTables.
+ * min-width membuat 8 kolom tidak terlalu sempit.
+ */
+#result1 {
+    width: 100% !important;
+    min-width: 850px;
+}
+
+#result1 th,
+#result1 td {
+    white-space: nowrap;
+    vertical-align: middle;
+}
 </style>
 
 <!-- Leaflet -->
@@ -268,36 +510,554 @@ function loadAISShipNames() {
 
         });
 }
-    // ================== LOAD SEMUA POSISI TERAKHIR ==================
-    function loadAllLastPositions() {
-        fetch('/track-ship/all-last-positions')
-            .then(r => r.json())
-            .then(positions => {
-                if (Array.isArray(positions) && positions.length > 0) {
-                    let bounds = [];
-                    positions.forEach(pos => {
-                        const marker = L.marker([pos.latitude, pos.longitude], {
-                            icon: createArrowIcon("red"),
-                            rotationAngle: pos.direct || 0,
-                            rotationOrigin: "center center"
-                        }).addTo(map);
+ // ================== LOAD NAMA KAPAL DARI AIS ==================
 
-                        marker.bindPopup(`
-                            <b>Date Time:</b> ${pos.datetime_utc}<br>
-                            <b>Name:</b> ${pos.vname}<br>
-                            <b>Status:</b> ${pos.status}<br>
-                            <b>Speed:</b> ${pos.speed} knots
-                        `);
-                        bounds.push([pos.latitude, pos.longitude]);
-                    });
-                    if (bounds.length > 0) map.fitBounds(bounds);
-                }
+function loadAISStatus() {
+
+    fetch('/track-ship/all-last-positions')
+        .then(response => {
+
+            if (!response.ok) {
+                throw new Error('Gagal mengambil data AIS');
+            }
+
+            return response.json();
+        })
+        .then(positions => {
+
+            const select =
+                document.getElementById('status');
+
+            if (!select) {
+                return;
+            }
+
+            // Reset dropdown
+            select.innerHTML = `
+                <option value="">
+                    Semua Status
+                </option>
+            `;
+
+            if (!Array.isArray(positions)) {
+                return;
+            }
+
+            // Ambil nama kapal dan hilangkan duplikat
+            const status1 = [
+                ...new Set(
+                    positions
+                        .map(pos => (pos.status || '').trim())
+                        .filter(status => status !== '')
+                )
+            ];
+
+            // Urutkan berdasarkan nama
+            status1.sort((a, b) =>
+                a.localeCompare(b)
+            );
+
+            // Masukkan ke dropdown
+            status1.forEach(status => {
+
+                const option =
+                    document.createElement('option');
+
+                option.value = status;
+                option.textContent = status;
+
+                select.appendChild(option);
             });
-    }
-    loadAllLastPositions();
-loadAISShipNames();
-setInterval(loadAISShipNames, 300000);
 
+        })
+        .catch(error => {
+
+            console.error(
+                'AIS Status Error:',
+                error
+            );
+
+        });
+}
+    // ================== LOAD SEMUA POSISI TERAKHIR ==================
+    // =====================================================
+// LOAD POSISI TERAKHIR SEMUA KAPAL
+// Historical menggunakan endpoint khusus
+// karena status terakhir boleh MOVING / IDLING / INACTIVE
+// =====================================================
+
+function loadAllLastPositions() {
+
+    fetch('/track-ship/historical-last-positions')
+
+        .then(response => {
+
+            if (!response.ok) {
+                throw new Error(
+                    'Gagal mengambil posisi terakhir kapal'
+                );
+            }
+
+            return response.json();
+        })
+
+        .then(positions => {
+
+            if (
+                !Array.isArray(positions) ||
+                positions.length === 0
+            ) {
+                return;
+            }
+
+            let bounds = [];
+
+            positions.forEach(pos => {
+
+                const lat =
+                    parseFloat(pos.latitude);
+
+                const lon =
+                    parseFloat(pos.longitude);
+
+                if (
+                    Number.isNaN(lat) ||
+                    Number.isNaN(lon)
+                ) {
+                    return;
+                }
+
+                // ==========================================
+                // WARNA MARKER BERDASARKAN STATUS
+                // ==========================================
+
+                const status =
+                    String(pos.status || '')
+                        .trim()
+                        .toLowerCase();
+
+                let markerColor = 'gray';
+
+                if (status === 'moving') {
+                    markerColor = 'green';
+                }
+
+                else if (status === 'idling') {
+                    markerColor = 'red';
+                }
+
+                else if (status === 'inactive') {
+                    markerColor = 'gray';
+                }
+
+                // ==========================================
+                // MARKER KAPAL
+                // ==========================================
+
+                const marker = L.marker(
+                    [lat, lon],
+                    {
+                        icon: createArrowIcon(markerColor),
+
+                        rotationAngle:
+                            parseFloat(pos.direct) || 0,
+
+                        rotationOrigin:
+                            "center center"
+                    }
+                ).addTo(map);
+
+                // ==========================================
+                // POPUP
+                // ==========================================
+
+                marker.bindPopup(`
+                    <b>Date Time:</b>
+                    ${pos.datetime_utc || '-'}
+                    <br>
+
+                    <b>Name:</b>
+                    ${pos.vname || '-'}
+                    <br>
+
+                    <b>Status:</b>
+                    ${pos.status || '-'}
+                    <br>
+
+                    <b>Speed:</b>
+                    ${pos.speed || 0} knots
+                    <br>
+
+                    <b>Latitude:</b>
+                    ${pos.latitude || '-'}
+                    <br>
+
+                    <b>Longitude:</b>
+                    ${pos.longitude || '-'}
+                `);
+
+                bounds.push([lat, lon]);
+            });
+
+            // ==========================================
+            // ZOOM KE SEMUA KAPAL
+            // ==========================================
+
+            if (bounds.length > 0) {
+
+                map.fitBounds(bounds, {
+                    padding: [30, 30]
+                });
+
+            }
+
+        })
+
+        .catch(error => {
+
+            console.error(
+                'Historical vessel error:',
+                error
+            );
+
+        });
+}
+   
+// =====================================================
+// LOAD CARD SEMUA KAPAL
+// Historical menampilkan status terakhir sebenarnya
+// =====================================================
+
+function loadHistoricalVessels() {
+
+    fetch('/track-ship/historical-last-positions')
+
+        .then(response => {
+
+            if (!response.ok) {
+                throw new Error(
+                    'Gagal mengambil data kapal'
+                );
+            }
+
+            return response.json();
+        })
+
+        .then(positions => {
+
+            const container =
+                document.getElementById(
+                    'historical-vessel-container'
+                );
+
+            if (!container) {
+                return;
+            }
+
+            container.innerHTML = '';
+
+            if (
+                !Array.isArray(positions) ||
+                positions.length === 0
+            ) {
+
+                container.innerHTML = `
+                    <div class="col-12">
+                        <div class="historical-empty">
+                            <i class="fas fa-ship"></i>
+                            <br>
+                            Tidak ada data kapal.
+                        </div>
+                    </div>
+                `;
+
+                return;
+            }
+
+            // ==========================================
+            // LOOP SEMUA KAPAL
+            // ==========================================
+
+            positions.forEach(pos => {
+
+                const vesselName =
+                    pos.vname || 'Unknown Vessel';
+
+                const status =
+                    String(pos.status || '')
+                        .trim()
+                        .toLowerCase();
+
+                const speed =
+                    parseFloat(pos.speed) || 0;
+
+                // ==========================================
+                // TENTUKAN WARNA CARD
+                // ==========================================
+
+                let statusClass = 'unknown';
+                let statusText =
+                    pos.status || 'UNKNOWN';
+
+                if (status === 'moving') {
+
+                    statusClass = 'moving';
+                    statusText = 'MOVING';
+
+                }
+
+                else if (status === 'idling') {
+
+                    statusClass = 'idling';
+                    statusText = 'IDLING';
+
+                }
+
+                else if (status === 'inactive') {
+
+                    statusClass = 'inactive';
+                    statusText = 'INACTIVE';
+
+                }
+
+                // ==========================================
+                // CARD
+                // ==========================================
+
+                const col =
+                    document.createElement('div');
+
+                col.className =
+                    'col-6 col-sm-4 col-md-3 mb-3';
+
+                col.style.cursor = 'pointer';
+
+                col.innerHTML = `
+                    <div
+                        class="historical-vessel-card ${statusClass}"
+                    >
+
+                        <div class="historical-vessel-icon">
+                            <i class="fas fa-ship"></i>
+                        </div>
+
+                        <div class="historical-vessel-name">
+                            ${escapeHistoricalHtml(
+                                vesselName
+                            )}
+                        </div>
+
+                        <div class="historical-vessel-status">
+                            ${escapeHistoricalHtml(
+                                statusText
+                            )}
+                        </div>
+
+                        <div class="historical-vessel-info">
+
+                            <div>
+                                <i class="fas fa-tachometer-alt"></i>
+                                Speed:
+                                ${speed.toFixed(2)}
+                                knots
+                            </div>
+
+                            <div
+                                class="historical-vessel-location"
+                            >
+                                <i class="fas fa-map-marker-alt"></i>
+
+                                <span
+                                    class="historical-vessel-location-text"
+                                >
+                                    Mencari lokasi...
+                                </span>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+                `;
+
+                container.appendChild(col);
+
+                // ==========================================
+                // KETIKA CARD DIKLIK
+                // FOCUS KE KAPAL DI MAP
+                // ==========================================
+
+                col.addEventListener(
+                    'click',
+                    function () {
+
+                        map.flyTo(
+                            [pos.latitude, pos.longitude],
+                            10,
+                            {
+                                animate: true,
+                                duration: 1.5
+                            }
+                        );
+
+                    }
+                );
+
+                // ==========================================
+                // REVERSE GEOCODING
+                // ==========================================
+
+                const locationElement =
+                    col.querySelector(
+                        '.historical-vessel-location-text'
+                    );
+
+                getHistoricalLocation(
+                    pos.latitude,
+                    pos.longitude,
+                    locationElement
+                );
+
+            });
+
+        })
+
+        .catch(error => {
+
+            console.error(
+                'Historical vessel card error:',
+                error
+            );
+
+        });
+}
+// =====================================================
+// LOKASI KAPAL
+// =====================================================
+
+function getHistoricalLocation(
+    latitude,
+    longitude,
+    element
+) {
+
+    if (
+        !latitude ||
+        !longitude
+    ) {
+
+        element.innerText =
+            'Lokasi tidak tersedia';
+
+        return;
+    }
+
+    fetch(
+        `https://nominatim.openstreetmap.org/reverse` +
+        `?format=jsonv2` +
+        `&lat=${encodeURIComponent(latitude)}` +
+        `&lon=${encodeURIComponent(longitude)}` +
+        `&zoom=10` +
+        `&addressdetails=1`
+    )
+
+    .then(response => {
+
+        if (!response.ok) {
+            throw new Error(
+                'Reverse geocoding gagal'
+            );
+        }
+
+        return response.json();
+
+    })
+
+    .then(data => {
+
+        if (
+            !data ||
+            !data.display_name
+        ) {
+
+            element.innerText =
+                'Lokasi tidak ditemukan';
+
+            return;
+        }
+
+        const address =
+            data.address || {};
+
+        let location = [];
+
+        if (address.sea) {
+            location.push(address.sea);
+        }
+
+        if (address.ocean) {
+            location.push(address.ocean);
+        }
+
+        if (address.state) {
+            location.push(address.state);
+        }
+
+        if (address.country) {
+            location.push(address.country);
+        }
+
+        if (location.length === 0) {
+
+            location.push(
+                data.display_name
+            );
+
+        }
+
+        element.innerText =
+            location.join(', ');
+
+    })
+
+    .catch(error => {
+
+        console.error(
+            'Historical location error:',
+            error
+        );
+
+        element.innerText =
+            `${latitude}, ${longitude}`;
+
+    });
+}
+function escapeHistoricalHtml(value) {
+
+    const div =
+        document.createElement('div');
+
+    div.textContent = value;
+
+    return div.innerHTML;
+}
+
+// =====================================================
+// LOAD MAP + SEMUA KAPAL
+// =====================================================
+
+loadAllLastPositions();
+loadHistoricalVessels();
+loadAISShipNames();
+loadAISStatus();
+
+setInterval(loadAISShipNames, 300000);
+setInterval(loadAISStatus, 300000);
+setInterval(function () {
+
+    loadHistoricalVessels();
+
+}, 30000);
     // ================== FILTER ==================
 function filterByDate() {
     var startDate = document.getElementById('start-date').value;

@@ -7,8 +7,8 @@
         <li class="nav-item d-none d-sm-inline-block">
             @if(auth()->user()->hasRole('admin'))
                 <a href="/admin-page" class="nav-link">Home</a>
-            @elseif(auth()->user()->hasRole('purchasing'))
-                <a href="/purchasing-page" class="nav-link">Home</a>
+            @elseif(auth()->user()->hasRole('operator'))
+                <a href="/operator-page" class="nav-link">Home</a>
             @elseif(auth()->user()->hasRole('vessel'))
                 <a href="/vessel-page" class="nav-link">Home</a>
             @endif

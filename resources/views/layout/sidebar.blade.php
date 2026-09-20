@@ -4,8 +4,8 @@
     <img src="{{asset('logo/logo-logindo.png')}}" alt="AdminLTE Logo" class="brand-image img-circle elevation-3" style="opacity: .8">
     <span class="brand-text" style="color: black;font-weight: bold; ">LOGINDO</span>
   </a>
-    @elseif(auth()->user()->hasRole('purchasing'))
-    <a href="/purchasing-page" class="brand-link navbar-light">
+    @elseif(auth()->user()->hasRole('operator'))
+    <a href="/operator-page" class="brand-link navbar-light">
       <img src="{{asset('logo/logo-logindo.png')}}" alt="AdminLTE Logo" class="brand-image img-circle elevation-3" style="opacity: .8">
     <span class="brand-text" style="color: black;font-weight: bold; ">LOGINDO</span>
   </a>
@@ -49,8 +49,8 @@
         <li class="nav-item ">
           @if (auth()->user()->hasRole('admin'))
           <a href="/admin-page" class="nav-link ">
-            @elseif(auth()->user()->hasRole('purchasing'))
-            <a href="/purchasing-page" class="nav-link ">
+            @elseif(auth()->user()->hasRole('operator'))
+            <a href="/operator-page" class="nav-link ">
             @elseif(auth()->user()->hasRole('vessel'))
             <a href="/vessel-page" class="nav-link ">
             @endif
@@ -68,27 +68,25 @@
             </p>
           </a>
         </li> -->
-        @if (auth()->user()->hasRole('admin')|| auth()->user()->hasRole('purchasing'))
         <li class="nav-item">
           <a href="/history" class="nav-link">
-            <i class="nav-icon fas fa-cart-plus"></i>
-            <p>
-              Historical Rute Vessel
-            </p>
-          </a>
-        </li>
-        @endif
-        <!-- @if (auth()->user()->hasRole('admin'))
-        <li class="nav-item">
-          <a href="/vessel" class="nav-link">
             <i class="nav-icon fas fa-ship"></i>
             <p>
-              Vessel
+              Historical Route Vessel
+            </p>
+          </a>
+        </li>
+       @if (auth()->user()->hasRole('admin'))
+        <li class="nav-item">
+          <a href="/routes/create" class="nav-link">
+            <i class="nav-icon fas fa-map-marker-alt"></i>
+            <p>
+              Route Waypoints
             </p>
           </a>
         </li>
         @endif
-        @if (auth()->user()->hasRole('admin')|| auth()->user()->hasRole('purchasing'))
+        <!-- @if (auth()->user()->hasRole('admin')|| auth()->user()->hasRole('operator'))
         <li class="nav-item">
           <a href="/product" class="nav-link">
             <i class="nav-icon fas fa-cart-plus"></i>

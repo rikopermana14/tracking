@@ -14,7 +14,6 @@ use Illuminate\Support\Facades\Http;
 use Carbon\Carbon;
 use App\Models\Route;
 use App\Models\RouteWaypoint;
-use Illuminate\Support\Facades\DB;
 
 
 class HomeController extends Controller
@@ -25,20 +24,26 @@ class HomeController extends Controller
     }
 
     // ================== DASHBOARD ==================
-    public function index()
-    {
-        $users = Auth::id();
-        // $user = Vessel::where('id_user', $users)->get();
-        // $data = Vessel::all();
+   public function index()
+{
+    $users = Auth::id();
 
-        // ambil semua lokasi
-        $locations = ships::all();
+    // Ambil semua kapal
+    $locations = ships::where('status', 'MOVING')->get();
 
-        // // stok untuk indikator
-        // $inventory = Product::all();
+    // Hitung jumlah kapal berdasarkan status
+    $movingCount = ships::where('status', 'MOVING')->count();
+    $inactiveCount = ships::where('status', 'INACTIVE')->count();
+    $idlingCount = ships::where('status', 'IDLING')->count();
 
-        return view('index', compact('users','locations'));
-    }
+    return view('index', compact(
+        'users',
+        'locations',
+        'movingCount',
+        'inactiveCount',
+        'idlingCount'
+    ));
+}
 
     
 // ================== ROUTE PLANNER ==================
@@ -412,90 +417,36 @@ private function calculateRouteDistanceNm($points)
         return view('history', compact('users','locations'));
     }
 
-    public function historicalLastPositions()
-{
-    // =====================================================
-    // AMBIL WAKTU TERAKHIR DARI SETIAP KAPAL
-    // =====================================================
-    $latest = ships::select(
-            'vname',
-            DB::raw('MAX(datetime_utc) AS latest_datetime')
-        )
-        ->whereNotNull('vname')
-        ->groupBy('vname');
-
-    // =====================================================
-    // AMBIL DATA LENGKAP DARI POSISI TERAKHIR
-    // SETIAP KAPAL
-    // =====================================================
-    $locations = ships::joinSub(
-            $latest,
-            'latest',
-            function ($join) {
-                $join->on(
-                    'ships.vname',
-                    '=',
-                    'latest.vname'
-                )
-                ->on(
-                    'ships.datetime_utc',
-                    '=',
-                    'latest.latest_datetime'
-                );
-            }
-        )
-        ->select('ships.*')
-        ->orderBy('ships.vname')
-        ->get();
-
-    return response()->json($locations);
-}
-
     // ================== API UNTUK MAP ==================
     public function getLastPosition()
-{
- $lastPosition = ships::orderBy('datetime_utc', 'desc')->first();
+    {
+        $lastPosition = ships::orderBy('datetime_utc', 'desc')->first();
         return response()->json($lastPosition);
-}
+    }
 
     public function allLastPositions()
-{
-    // =====================================================
-    // AMBIL DATA MOVING TERAKHIR UNTUK SETIAP KAPAL
-    // =====================================================
-    $latestMoving = ships::select(
-            'vname',
-            DB::raw('MAX(datetime_utc) AS latest_datetime')
-        )
-        ->where('status', 'MOVING')
-        ->where('speed', '>=', 1)
-        ->groupBy('vname');
+    {
+        // Ambil lokasi terakhir per kapal (group by vname)
+        $positions = ships::select(
+                'id',
+                'vname',
+                'status',
+                'latitude',
+                'longitude',
+                'speed',
+                'direct',
+                'mileage',
+                'datetime_utc'
+            )
+            ->whereIn('id', function($query) {
+                $query->selectRaw('MAX(id)')
+                      ->from('ships')
+                      ->groupBy('vname');
+            })
+            ->get();
 
-    // =====================================================
-    // AMBIL RECORD LENGKAP BERDASARKAN
-    // VNAME + DATETIME MOVING TERAKHIR
-    // =====================================================
-    $locations = ships::joinSub(
-            $latestMoving,
-            'latest_moving',
-            function ($join) {
-                $join->on(
-                    'ships.vname',
-                    '=',
-                    'latest_moving.vname'
-                )
-                ->on(
-                    'ships.datetime_utc',
-                    '=',
-                    'latest_moving.latest_datetime'
-                );
-            }
-        )
-        ->select('ships.*')
-        ->get();
-
-    return response()->json($locations);
-}
+        return response()->json($positions);
+    }
 
     public function getCoordinatesByName(Request $request)
     {

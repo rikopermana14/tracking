@@ -746,6 +746,9 @@ vesselMarkers[vesselKey] = marker;
     autoPanPaddingTopLeft: [10, 50],
     autoPanPaddingBottomRight: [10, 20]
 });
+// =====================================================
+// EVENT SAAT POPUP KAPAL DIBUKA
+// =====================================================
 marker.on("popupopen", function(e) {
 
     initPopupAutocomplete(e, pos);
@@ -799,13 +802,63 @@ marker.on("popupopen", function(e) {
     loadLastPositions();
 
     function initPopupAutocomplete(e, shipPos) {
-        const container = e.popup.getElement();
-        const inputPopup = container.querySelector(".popup-destination");
-        const suggestionPopup = container.querySelector(".popup-suggestions");
 
-       let searchTimeout;
+    const container = e.popup.getElement();
+    const inputPopup = container.querySelector(".popup-destination");
+    const suggestionPopup = container.querySelector(".popup-suggestions");
+
+    let searchTimeout;
+
+    // ==========================================
+    // CEK STATUS KAPAL
+    // HANYA MOVING YANG BOLEH HITUNG ROUTE / ETA
+    // ==========================================
+
+    const shipStatus = String(shipPos.status || '')
+        .trim()
+        .toLowerCase();
+
+    if (shipStatus !== 'moving') {
+
+        inputPopup.disabled = true;
+
+        inputPopup.placeholder =
+            "Route hanya tersedia saat kapal MOVING";
+
+        inputPopup.style.backgroundColor = "#eee";
+        inputPopup.style.cursor = "not-allowed";
+
+        return;
+    }
+
+    // Kapal MOVING
+    inputPopup.disabled = false;
+    inputPopup.placeholder = "Ketik lokasi...";
 
 inputPopup.addEventListener("input", function () {
+
+    // ==========================================
+    // SECURITY CHECK
+    // HANYA MOVING
+    // ==========================================
+
+    const currentStatus = String(shipPos.status || '')
+        .trim()
+        .toLowerCase();
+
+    if (currentStatus !== 'moving') {
+
+        clearTimeout(searchTimeout);
+
+        suggestionPopup.innerHTML = "";
+        suggestionPopup.style.display = "none";
+
+        this.value = "";
+
+        alert("Kapal tidak dalam status MOVING. Perhitungan route, distance, dan ETA tidak tersedia.");
+
+        return;
+    }
 
     clearTimeout(searchTimeout);
 
@@ -818,9 +871,27 @@ inputPopup.addEventListener("input", function () {
 
     searchTimeout = setTimeout(() => {
 
-        fetch(
-            `/track-ship/search-destination?q=${encodeURIComponent(query)}`
-        )
+    // ==========================================
+    // CEK ULANG STATUS SEBELUM SEARCH
+    // ==========================================
+
+    const currentStatus = String(shipPos.status || '')
+        .trim()
+        .toLowerCase();
+
+    if (currentStatus !== 'moving') {
+
+        suggestionPopup.innerHTML = "";
+        suggestionPopup.style.display = "none";
+
+        alert("Kapal tidak dalam status MOVING. Pencarian destination dibatalkan.");
+
+        return;
+    }
+
+    fetch(
+        `/track-ship/search-destination?q=${encodeURIComponent(query)}`
+    )
         .then(res => res.json())
         .then(data => {
 
@@ -858,41 +929,63 @@ if (routeStatus) {
     routeStatus.className =
         'route-status waiting';
 }
+// =================================================
+// Membuat Garis Polyline
+// =================================================
+const destLat = parseFloat(place.lat);
+const destLon = parseFloat(place.lon);
 
-                            const destLat = parseFloat(place.lat);
-                            const destLon = parseFloat(place.lon);
+const shipLat = parseFloat(shipPos.latitude);
+const shipLon = parseFloat(shipPos.longitude);
+                           
+if (destMarker) {
+    map.removeLayer(destMarker);
+}
 
-                            const shipLat = parseFloat(shipPos.latitude);
-                            const shipLon = parseFloat(shipPos.longitude);
+if (routeLine) {
+    map.removeLayer(routeLine);
+}
 
-                            if (destMarker) {
-                                map.removeLayer(destMarker);
-                            }
+if (connectorLine) {
+    map.removeLayer(connectorLine);
+}
 
-                            if (routeLine) {
-                                map.removeLayer(routeLine);
-                            }
+destMarker = L.marker([destLat, destLon], {
+    icon: createArrowIcon("blue")
+})
+.addTo(map)
+.bindPopup(place.display_name)
+.openPopup();
+// ==========================================
+// FINAL CHECK SEBELUM GENERATE ROUTE
+// ==========================================
 
-                            if (connectorLine) {
-                                map.removeLayer(connectorLine);
-                            }
+const currentStatus = String(shipPos.status || '')
+    .trim()
+    .toLowerCase();
 
-                            destMarker = L.marker([destLat, destLon], {
-                                icon: createArrowIcon("blue")
-                            })
-                            .addTo(map)
-                            .bindPopup(place.display_name)
-                            .openPopup();
+if (currentStatus !== 'moving') {
 
-                            fetch('/track-ship/generate-route', {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                    'X-CSRF-TOKEN': document.querySelector(
-                                        'meta[name="csrf-token"]'
-                                    ).content
-                                },
-                              body: JSON.stringify({
+    alert(
+        "Kapal tidak dalam status MOVING.\n\n" +
+        "Route, Haversine/Distance, dan ETA tidak dapat dihitung."
+    );
+
+    document.getElementById('estimated-time').innerText = '-';
+    document.getElementById('destination-distance').innerText = '-';
+    document.getElementById('average-speed').innerText = '-';
+
+    return;
+}
+fetch('/track-ship/generate-route', {
+    method: 'POST',
+    headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-TOKEN': document.querySelector(
+            'meta[name="csrf-token"]'
+        ).content
+    },
+  body: JSON.stringify({
 
 
     ship_lat: shipLat,
@@ -903,51 +996,41 @@ if (routeStatus) {
 
     corridor_nm: 5
 })
-                            })
-                            .then(async res => {
+})
+.then(async res => {
 
-                                const routeData = await res.json();
+    const routeData = await res.json();
 
-                                if (!res.ok) {
-                                    console.error("Generate route HTTP error:", routeData);
-                                    throw routeData;
-                                }
+    if (!res.ok) {
+        console.error("Generate route HTTP error:", routeData);
+        throw routeData;
+    }
 
-                                return routeData;
-                            })
-                            .then(routeData => {
+    return routeData;
+})
+.then(routeData => {
 
-                                console.log("ROUTE DATA", routeData);
+    console.log("ROUTE DATA", routeData);
 console.log(
     "SELECTED ROUTE:",
     routeData.selected_route_id,
     routeData.selected_route_name
 );
-                                if (routeData.error) {
-                                    alert(routeData.error);
-                                    return;
-                                }
+    if (routeData.error) {
+        alert(routeData.error);
+        return;
+    }
 
-                                if (!routeData.route_path || routeData.route_path.length < 2) {
-                                    console.error("Route path tidak valid:", routeData);
-                                    alert("Route path tidak ditemukan atau point kurang dari 2.");
-                                    return;
-                                }
+    if (!routeData.route_path || routeData.route_path.length < 2) {
+        console.error("Route path tidak valid:", routeData);
+        alert("Route path tidak ditemukan atau point kurang dari 2.");
+        return;
+    }
 
-// let routeCoordinates = [];
 
-// const isOnRoute = routeData.is_on_route === true;
-
-// /*
-//  * Kalau kapal masih dalam corridor route,
-//  * garis biru dimulai dari posisi kapal.
-//  */
-// if (isOnRoute) {
-//     routeCoordinates.push([
-//         parseFloat(shipLat),
-//         parseFloat(shipLon)
-//     ]);
-// }
+// =================================================
+// MEMBUAT Rute Polyline
+// =================================================
 let routeCoordinates = [];
 
 routeData.route_path.forEach(point => {
@@ -977,16 +1060,20 @@ connectorLine = L.polyline([
     dashArray:'5,5'
 }).addTo(map);
 
+// =================================================
+// Perhitungan Haversine / Distance
+// =================================================
+
 const offRouteDistanceNM =
     parseFloat(routeData.off_route_distance_nm) || 0;
 
 
-                                map.fitBounds(routeLine.getBounds());
+    map.fitBounds(routeLine.getBounds());
 
-                                let distanceNM = parseFloat(routeData.distance_nm) || 0;
+    let distanceNM = parseFloat(routeData.distance_nm) || 0;
 
-                                document.getElementById('destination-distance').innerText =
-                                    `Distance To Destination : ${distanceNM.toFixed(2)} NM`;
+    document.getElementById('destination-distance').innerText =
+        `Distance To Destination : ${distanceNM.toFixed(2)} NM`;
 const routeStatus =
     document.getElementById('route-status-badge');
 
@@ -1032,11 +1119,11 @@ if (routeData.is_on_route === true || routeData.is_on_route == 1) {
     `;
 }
 
-                                const shipSpeed = parseFloat(shipPos.speed) || 0;
+    const shipSpeed = parseFloat(shipPos.speed) || 0;
 
-                                if (shipSpeed > 0) {
+    if (shipSpeed > 0) {
 
-                                   const eta = distanceNM / shipSpeed;
+       const eta = distanceNM / shipSpeed;
 
 const totalMinutes = Math.round(eta * 60);
 
@@ -1059,22 +1146,22 @@ if (days > 0) {
 document.getElementById('estimated-time').innerText =
     `${hours}h ${minutes}m / ${etaDayText}`;
 
-                                    document.getElementById('average-speed').innerText =
-                                        `Average Speed: ${shipSpeed.toFixed(2)} knots`;
+        document.getElementById('average-speed').innerText =
+            `Average Speed: ${shipSpeed.toFixed(2)} knots`;
 
-                                } else {
+    } else {
 
-                                    document.getElementById('estimated-time').innerText =
-                                        "ETA : kapal sedang diam / speed 0";
+        document.getElementById('estimated-time').innerText =
+            "ETA : kapal sedang diam / speed 0";
 
-                                    document.getElementById('average-speed').innerText =
-                                        "Average Speed: 0 knots";
-                                }
-                            })
-                            .catch(err => {
-                                console.error("Generate route error:", err);
-                                alert("Gagal generate route. Cek console / network.");
-                            });
+        document.getElementById('average-speed').innerText =
+            "Average Speed: 0 knots";
+    }
+})
+.catch(err => {
+    console.error("Generate route error:", err);
+    alert("Gagal generate route. Cek console / network.");
+});
                         };
 
                         suggestionPopup.appendChild(div);
@@ -1193,11 +1280,11 @@ document.getElementById('estimated-time').innerText =
 
                     container.innerHTML = `
                         <div class="col-12">
-                            <div class="ais-empty">
-                                <i class="fas fa-ship"></i>
-                                <br>
-                                Tidak ada data kapal AIS.
-                            </div>
+                        <div class="ais-empty">
+                        <i class="fas fa-ship"></i>
+                        <br>
+                        Tidak ada data kapal AIS.
+                        </div>
                         </div>
                     `;
 
@@ -1216,8 +1303,8 @@ document.getElementById('estimated-time').innerText =
 
                     const status =
                         String(pos.status || '')
-                            .trim()
-                            .toLowerCase();
+                        .trim()
+                        .toLowerCase();
 
                     const speed =
                         parseFloat(pos.speed) || 0;
@@ -1243,13 +1330,13 @@ document.getElementById('estimated-time').innerText =
 
                     const latitude =
                         pos.latitude !== undefined
-                            ? pos.latitude
-                            : '-';
+                        ? pos.latitude
+                        : '-';
 
                     const longitude =
                         pos.longitude !== undefined
-                            ? pos.longitude
-                            : '-';
+                        ? pos.longitude
+                        : '-';
 
                     const col = document.createElement('div');
 
@@ -1261,34 +1348,34 @@ col.style.cursor = 'pointer';
                     col.innerHTML = `
                         <div class="ais-vessel-card ${statusClass}">
 
-                            <div class="ais-vessel-icon">
-                                <i class="fas fa-ship"></i>
-                            </div>
+<div class="ais-vessel-icon">
+    <i class="fas fa-ship"></i>
+</div>
 
-                            <div class="ais-vessel-name">
-                                ${escapeAISHtml(vesselName)}
-                            </div>
+<div class="ais-vessel-name">
+    ${escapeAISHtml(vesselName)}
+</div>
 
-                            <div class="ais-vessel-status">
-                                ${escapeAISHtml(statusText)}
-                            </div>
+<div class="ais-vessel-status">
+    ${escapeAISHtml(statusText)}
+</div>
 
-                            <div class="ais-vessel-info">
+<div class="ais-vessel-info">
 
-                                <div>
-                                    <i class="fas fa-tachometer-alt"></i>
-                                    Speed:
-                                    ${speed.toFixed(2)} knots
-                                </div>
+    <div>
+        <i class="fas fa-tachometer-alt"></i>
+        Speed:
+        ${speed.toFixed(2)} knots
+    </div>
 
-                               <div class="ais-vessel-location">
+   <div class="ais-vessel-location">
     <i class="fas fa-map-marker-alt"></i>
     <span class="vessel-location-text">
         Mencari lokasi...
     </span>
 </div>
 
-                            </div>
+</div>
 
                         </div>
                     `;
@@ -1344,9 +1431,9 @@ getAISLocation(
                 ).innerHTML = `
                     <div class="col-12">
                         <div class="ais-empty text-danger">
-                            <i class="fas fa-exclamation-triangle"></i>
-                            <br>
-                            Gagal mengambil data AIS.
+<i class="fas fa-exclamation-triangle"></i>
+<br>
+Gagal mengambil data AIS.
                         </div>
                     </div>
                 `;
