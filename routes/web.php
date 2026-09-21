@@ -76,6 +76,15 @@ Route::middleware(['web', 'auth'])->group(function () {
     // =====================================================
 
     Route::middleware(['role:admin|operator'])->group(function () {
+       Route::get(
+    '/track-ship/route-estimation',
+    [HomeController::class, 'routeEstimationPage']
+)->name('track-ship.route-estimation');
+
+Route::post(
+    '/track-ship/calculate-route-estimation',
+    [HomeController::class, 'calculateRouteEstimation']
+)->name('track-ship.calculate-route-estimation');
 
     Route::get(
     '/track-ship/historical-last-positions',

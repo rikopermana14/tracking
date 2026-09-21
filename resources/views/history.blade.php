@@ -206,6 +206,7 @@
 </div>
 
 <style>
+    
             /* =========================================================
    HISTORICAL VESSEL SECTION
    ========================================================= */
@@ -378,6 +379,26 @@
     }
     #map { height: 250px; margin-top: 20px; }
     #filter-form { margin: 20px; position: relative; }
+    /* =====================================================
+   BARIS TABLE BISA DIKLIK
+   ===================================================== */
+
+#result1 tbody tr {
+    cursor: pointer;
+}
+
+#result1 tbody tr:hover {
+    background-color: #e8f4ff !important;
+}
+
+
+/* =====================================================
+   MARKER YANG DIPILIH
+   ===================================================== */
+
+.selected-history-marker {
+    z-index: 9999 !important;
+}
     /* =========================================================
    RESPONSIVE DATATABLE
    ========================================================= */
@@ -412,7 +433,10 @@
 
 <script>
     var map = L.map('map').setView([0, 0], 2);
-    var table1;
+var table1;
+
+// Marker khusus untuk posisi yang dipilih dari tabel
+var selectedHistoryMarker = null;
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap contributors'
@@ -1058,6 +1082,233 @@ setInterval(function () {
     loadHistoricalVessels();
 
 }, 30000);
+// =====================================================
+// TAMPILKAN POSISI HISTORY YANG DIPILIH DARI TABLE
+// =====================================================
+
+function showHistoryPoint(
+    latitude,
+    longitude,
+    datetime,
+    shipName,
+    speed,
+    mileage,
+    status
+) {
+
+    latitude = parseFloat(latitude);
+    longitude = parseFloat(longitude);
+
+
+    // =================================================
+    // VALIDASI KOORDINAT
+    // =================================================
+
+    if (
+        isNaN(latitude) ||
+        isNaN(longitude)
+    ) {
+
+        alert(
+            'Koordinat tidak valid.'
+        );
+
+        return;
+    }
+
+
+    // =================================================
+    // HAPUS MARKER PILIHAN SEBELUMNYA
+    // =================================================
+
+    if (selectedHistoryMarker) {
+
+        map.removeLayer(
+            selectedHistoryMarker
+        );
+
+        selectedHistoryMarker = null;
+
+    }
+
+
+    // =================================================
+    // BUAT MARKER BESAR
+    // =================================================
+
+    selectedHistoryMarker =
+        L.circleMarker(
+            [
+                latitude,
+                longitude
+            ],
+            {
+                radius: 10,
+
+                color: '#ffffff',
+
+                weight: 3,
+
+                fillColor: '#ff0000',
+
+                fillOpacity: 1,
+
+                className:
+                    'selected-history-marker'
+            }
+        ).addTo(map);
+
+
+    // =================================================
+    // POPUP
+    // =================================================
+
+    selectedHistoryMarker.bindPopup(`
+
+        <div style="min-width:220px;">
+
+            <b style="font-size:15px;">
+                ${shipName}
+            </b>
+
+            <hr style="margin:6px 0;">
+
+            <b>Date Time:</b>
+            ${datetime}
+
+            <br>
+
+            <b>Latitude:</b>
+            ${latitude.toFixed(6)}
+
+            <br>
+
+            <b>Longitude:</b>
+            ${longitude.toFixed(6)}
+
+            <br>
+
+            <b>Speed:</b>
+            ${speed} knots
+
+            <br>
+
+            <b>Mileage:</b>
+            ${mileage}
+
+            <br>
+
+            <b>Status:</b>
+            ${status || '-'}
+
+        </div>
+
+    `);
+
+
+    // =================================================
+    // PINDAHKAN PETA KE TITIK
+    // =================================================
+
+    map.setView(
+        [
+            latitude,
+            longitude
+        ],
+        14,
+        {
+            animate: true
+        }
+    );
+
+
+    // =================================================
+    // BUKA POPUP
+    // =================================================
+
+    selectedHistoryMarker.openPopup();
+
+}
+// =====================================================
+// KLIK BARIS TABLE → TAMPILKAN POSISI DI MAP
+// =====================================================
+
+$('#result1 tbody').on(
+    'click',
+    'tr',
+    function () {
+
+        // Ambil data dari baris yang diklik
+        const rowData =
+            table1.row(this).data();
+
+
+        // Tidak ada data
+        if (!rowData) {
+
+            return;
+
+        }
+
+
+        // Struktur rowData:
+        //
+        // [0] No
+        // [1] Date Time
+        // [2] Name
+        // [3] Latitude
+        // [4] Longitude
+        // [5] Speed
+        // [6] Mileage
+        // [7] Status
+
+
+        const datetime =
+            rowData[1];
+
+        const shipName =
+            rowData[2];
+
+        const latitude =
+            rowData[3];
+
+        const longitude =
+            rowData[4];
+
+        const speed =
+            rowData[5];
+
+        const mileage =
+            rowData[6];
+
+        const status =
+            rowData[7];
+
+
+        // =================================================
+        // TAMPILKAN DI MAP
+        // =================================================
+
+        showHistoryPoint(
+
+            latitude,
+
+            longitude,
+
+            datetime,
+
+            shipName,
+
+            speed,
+
+            mileage,
+
+            status
+
+        );
+
+    }
+);
     // ================== FILTER ==================
 function filterByDate() {
     var startDate = document.getElementById('start-date').value;

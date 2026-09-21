@@ -9,12 +9,6 @@
       <img src="{{asset('logo/logo-logindo.png')}}" alt="AdminLTE Logo" class="brand-image img-circle elevation-3" style="opacity: .8">
     <span class="brand-text" style="color: black;font-weight: bold; ">LOGINDO</span>
   </a>
-    @elseif(auth()->user()->hasRole('vessel'))
-    <a href="/vessel-page" class="brand-link navbar-light">
-      <img src="{{asset('logo/logo-logindo.png')}}" alt="AdminLTE Logo" class="brand-image img-circle elevation-3" style="opacity: .8">
-    <span class="brand-text" style="color: black;font-weight: bold; ">LOGINDO</span>
-    
-  </a>
   @endif
 
   <!-- Sidebar -->
@@ -86,16 +80,16 @@
           </a>
         </li>
         @endif
-        <!-- @if (auth()->user()->hasRole('admin')|| auth()->user()->hasRole('operator'))
+        @if (auth()->user()->hasRole('admin')|| auth()->user()->hasRole('operator'))
         <li class="nav-item">
-          <a href="/product" class="nav-link">
+          <a href="/track-ship/route-estimation" class="nav-link">
             <i class="nav-icon fas fa-cart-plus"></i>
             <p>
               Inventory
             </p>
           </a>
         </li>
-        @endif -->
+        @endif
         @if (auth()->user()->hasRole('admin'))
         <li class="nav-item">
           <a href="/user" class="nav-link">

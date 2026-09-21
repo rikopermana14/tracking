@@ -40,6 +40,21 @@ class HomeController extends Controller
         return view('index', compact('users','locations'));
     }
 
+    // ================== ROUTE ESTIMATION PAGE ==================
+
+public function routeEstimationPage()
+{
+    // Ambil daftar kapal unik berdasarkan nama kapal
+    $ships = ships::select('id', 'vname')
+        ->whereNotNull('vname')
+        ->where('vname', '!=', '')
+        ->orderBy('vname')
+        ->get()
+        ->unique('vname')
+        ->values();
+
+    return view('routes.route-estimation', compact('ships'));
+}
     
 // ================== ROUTE PLANNER ==================
 
@@ -664,4 +679,722 @@ private function calculateRouteDistanceNm($points)
         $user->delete();
         return redirect()->route('user')->with('success', 'User deleted successfully.');
     }
+
+    // ================== CALCULATE ROUTE ESTIMATION ==================
+
+// ================== CALCULATE ROUTE ESTIMATION ==================
+
+public function calculateRouteEstimation(Request $request)
+{
+    // =====================================================
+    // 1. VALIDASI INPUT
+    // =====================================================
+
+    $request->validate([
+        'ship_id'  => 'required',
+        'ship_lat' => 'required|numeric',
+        'ship_lon' => 'required|numeric',
+        'dest_lat' => 'required|numeric',
+        'dest_lon' => 'required|numeric',
+    ]);
+
+
+    // =====================================================
+    // 2. AMBIL INPUT
+    // =====================================================
+
+    $shipId = $request->ship_id;
+
+    $shipLat = (float) $request->ship_lat;
+    $shipLon = (float) $request->ship_lon;
+
+    $destLat = (float) $request->dest_lat;
+    $destLon = (float) $request->dest_lon;
+
+
+    // =====================================================
+    // 3. AMBIL DATA KAPAL
+    // =====================================================
+
+    $selectedShip = ships::find($shipId);
+
+    if (!$selectedShip) {
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Vessel not found.'
+        ], 404);
+
+    }
+
+    $shipName = $selectedShip->vname;
+
+
+    // =====================================================
+    // 4. CARI DATA HISTORY KAPAL
+    //    BERDASARKAN POSISI START TERDEKAT
+    // =====================================================
+
+    $shipHistory = ships::where(
+            'vname',
+            $shipName
+        )
+        ->whereNotNull('latitude')
+        ->whereNotNull('longitude')
+        ->get();
+
+
+    if ($shipHistory->isEmpty()) {
+
+        return response()->json([
+            'success' => false,
+            'message' =>
+                'No historical position found for this vessel.'
+        ], 404);
+
+    }
+
+
+    // =====================================================
+    // 5. CARI RECORD HISTORY PALING DEKAT
+    //    DENGAN POSISI START
+    // =====================================================
+
+    $nearestHistory = null;
+
+    $nearestDistance = PHP_FLOAT_MAX;
+
+
+    foreach ($shipHistory as $history) {
+
+        $distanceKm =
+            $this->haversineGreatCircleDistance(
+
+                $shipLat,
+                $shipLon,
+
+                (float) $history->latitude,
+                (float) $history->longitude
+
+            );
+
+
+        if ($distanceKm < $nearestDistance) {
+
+            $nearestDistance =
+                $distanceKm;
+
+            $nearestHistory =
+                $history;
+
+        }
+
+    }
+
+
+    if (!$nearestHistory) {
+
+        return response()->json([
+            'success' => false,
+            'message' =>
+                'Unable to determine initial vessel position.'
+        ], 404);
+
+    }
+
+
+    // =====================================================
+    // 6. INITIAL SPEED
+    //
+    // SPEED DIAMBIL DARI RECORD HISTORY TERDEKAT
+    // =====================================================
+
+    $speedKnots =
+        (float) $nearestHistory->speed;
+
+
+    $historicalStartTime =
+        $nearestHistory->datetime_utc;
+
+
+    // =====================================================
+    // VALIDASI SPEED
+    // =====================================================
+
+    if ($speedKnots <= 0) {
+
+        return response()->json([
+
+            'success' => false,
+
+            'message' =>
+                'Initial vessel speed must be greater than 0 knots.',
+
+            'historical_start' => [
+
+                'id' =>
+                    $nearestHistory->id,
+
+                'latitude' =>
+                    (float) $nearestHistory->latitude,
+
+                'longitude' =>
+                    (float) $nearestHistory->longitude,
+
+                'speed_knots' =>
+                    $speedKnots,
+
+                'datetime_utc' =>
+                    $nearestHistory->datetime_utc,
+
+            ],
+
+        ], 422);
+
+    }
+
+
+    // =====================================================
+    // 7. CARI ROUTE TERBAIK
+    //
+    // START + DESTINATION
+    //        ↓
+    // findBestRoute()
+    //        ↓
+    // ROUTE OTOMATIS
+    // =====================================================
+
+    $bestRoute =
+        $this->findBestRoute(
+
+            $shipLat,
+            $shipLon,
+
+            $destLat,
+            $destLon
+
+        );
+
+
+    if (!$bestRoute) {
+
+        return response()->json([
+            'success' => false,
+            'message' =>
+                'No suitable route found.'
+        ], 404);
+
+    }
+
+
+    // =====================================================
+    // 8. AMBIL DATA ROUTE
+    // =====================================================
+
+    $route =
+        $bestRoute['route'];
+
+    $waypoints =
+        $bestRoute['waypoints'];
+
+    $startSnap =
+        $bestRoute['shipSnap'];
+
+    $endSnap =
+        $bestRoute['destSnap'];
+
+
+    // =====================================================
+    // 9. POSISI START DAN DESTINATION
+    //    PADA ROUTE
+    // =====================================================
+
+    $startPos =
+        $startSnap['index']
+        +
+        $startSnap['t'];
+
+
+    $endPos =
+        $endSnap['index']
+        +
+        $endSnap['t'];
+
+
+    // =====================================================
+    // 10. BANGUN ROUTE PATH
+    //
+    // START SNAP
+    //      ↓
+    // WAYPOINT
+    //      ↓
+    // WAYPOINT
+    //      ↓
+    // DESTINATION SNAP
+    // =====================================================
+
+    $routePath = [];
+
+
+    // =====================================================
+    // START SNAP
+    // =====================================================
+
+    $routePath[] = [
+
+        'latitude' =>
+            $startSnap['latitude'],
+
+        'longitude' =>
+            $startSnap['longitude'],
+
+        'type' =>
+            'start_snap',
+
+    ];
+
+
+    // =====================================================
+    // WAYPOINT
+    // =====================================================
+
+    if ($startPos <= $endPos) {
+
+        for (
+
+            $i =
+                $startSnap['index'] + 1;
+
+            $i <= $endSnap['index'];
+
+            $i++
+
+        ) {
+
+            if (isset($waypoints[$i])) {
+
+                $routePath[] = [
+
+                    'latitude' =>
+                        (float)
+                        $waypoints[$i]->latitude,
+
+                    'longitude' =>
+                        (float)
+                        $waypoints[$i]->longitude,
+
+                    'sequence' =>
+                        $waypoints[$i]->sequence,
+
+                    'route_id' =>
+                        $waypoints[$i]->route_id,
+
+                    'type' =>
+                        'waypoint',
+
+                ];
+
+            }
+
+        }
+
+    } else {
+
+        for (
+
+            $i =
+                $startSnap['index'];
+
+            $i >=
+                $endSnap['index'] + 1;
+
+            $i--
+
+        ) {
+
+            if (isset($waypoints[$i])) {
+
+                $routePath[] = [
+
+                    'latitude' =>
+                        (float)
+                        $waypoints[$i]->latitude,
+
+                    'longitude' =>
+                        (float)
+                        $waypoints[$i]->longitude,
+
+                    'sequence' =>
+                        $waypoints[$i]->sequence,
+
+                    'route_id' =>
+                        $waypoints[$i]->route_id,
+
+                    'type' =>
+                        'waypoint',
+
+                ];
+
+            }
+
+        }
+
+    }
+
+
+    // =====================================================
+    // DESTINATION SNAP
+    // =====================================================
+
+    $routePath[] = [
+
+        'latitude' =>
+            $endSnap['latitude'],
+
+        'longitude' =>
+            $endSnap['longitude'],
+
+        'type' =>
+            'destination_snap',
+
+    ];
+
+
+    // =====================================================
+    // 11. HITUNG JARAK ROUTE
+    // =====================================================
+
+    $distanceNm =
+        $this->calculateRouteDistanceNm(
+            $routePath
+        );
+
+
+    // =====================================================
+    // 12. HITUNG WAKTU ESTIMASI
+    //
+    // Rumus:
+    //
+    // T = D / V
+    //
+    // D = nautical mile
+    // V = knot
+    // T = jam
+    // =====================================================
+
+    $travelHours =
+        $distanceNm /
+        $speedKnots;
+
+
+    // =====================================================
+    // 13. KONVERSI JAM KE DETIK
+    // =====================================================
+
+    $travelSeconds =
+        (int) round(
+            $travelHours * 3600
+        );
+
+
+    // =====================================================
+    // 14. FORMAT DURASI
+    // =====================================================
+
+    $days =
+        intdiv(
+            $travelSeconds,
+            86400
+        );
+
+
+    $remainingSeconds =
+        $travelSeconds % 86400;
+
+
+    $hours =
+        intdiv(
+            $remainingSeconds,
+            3600
+        );
+
+
+    $remainingSeconds =
+        $remainingSeconds % 3600;
+
+
+    $minutes =
+        intdiv(
+            $remainingSeconds,
+            60
+        );
+
+
+    $seconds =
+        $remainingSeconds % 60;
+
+
+    // =====================================================
+    // 15. FORMAT DURASI UNTUK VIEW
+    // =====================================================
+
+    $durationParts = [];
+
+
+    if ($days > 0) {
+
+        $durationParts[] =
+            $days .
+            ' day' .
+            ($days > 1 ? 's' : '');
+
+    }
+
+
+    if (
+        $hours > 0 ||
+        $days > 0
+    ) {
+
+        $durationParts[] =
+            $hours . ' h';
+
+    }
+
+
+    if (
+        $minutes > 0 ||
+        $hours > 0 ||
+        $days > 0
+    ) {
+
+        $durationParts[] =
+            $minutes . ' m';
+
+    }
+
+
+    $durationParts[] =
+        $seconds . ' s';
+
+
+    $duration =
+        implode(
+            ' ',
+            $durationParts
+        );
+
+
+    // =====================================================
+    // 16. WAKTU MULAI ESTIMASI
+    //
+    // UNTUK MODE ESTIMATION:
+    // menggunakan waktu saat perhitungan dilakukan.
+    //
+    // HISTORY TETAP DISIMPAN SEBAGAI REFERENSI
+    // =====================================================
+
+    $startTime =
+    Carbon::parse($historicalStartTime);
+
+
+    // =====================================================
+    // 17. HITUNG ETA
+    // =====================================================
+
+    $eta =
+        $startTime
+            ->copy()
+            ->addSeconds(
+                $travelSeconds
+            );
+
+
+    // =====================================================
+    // 18. RESPONSE
+    // =====================================================
+
+    return response()->json([
+
+        'success' => true,
+
+
+        // =================================================
+        // HISTORY YANG DIGUNAKAN UNTUK INITIAL SPEED
+        // =================================================
+
+        'historical_start' => [
+
+            'id' =>
+                $nearestHistory->id,
+
+            'latitude' =>
+                (float)
+                $nearestHistory->latitude,
+
+            'longitude' =>
+                (float)
+                $nearestHistory->longitude,
+
+            'speed_knots' =>
+                $speedKnots,
+
+            'datetime_utc' =>
+                $historicalStartTime,
+
+            'distance_from_input_km' =>
+                round(
+                    $nearestDistance,
+                    4
+                ),
+
+        ],
+
+
+        // =================================================
+        // VESSEL
+        // =================================================
+
+        'ship' => [
+
+            'id' =>
+                $selectedShip->id,
+
+            'name' =>
+                $selectedShip->vname,
+
+            'latitude' =>
+                $shipLat,
+
+            'longitude' =>
+                $shipLon,
+
+        ],
+
+
+        // =================================================
+        // ROUTE
+        // =================================================
+
+        'route' => [
+
+            'id' =>
+                $route->id,
+
+            'name' =>
+                $route->route_name,
+
+        ],
+
+
+        // =================================================
+        // START
+        // =================================================
+
+        'start' => [
+
+            'latitude' =>
+                $shipLat,
+
+            'longitude' =>
+                $shipLon,
+
+            'snap_latitude' =>
+                $startSnap['latitude'],
+
+            'snap_longitude' =>
+                $startSnap['longitude'],
+
+        ],
+
+
+        // =================================================
+        // DESTINATION
+        // =================================================
+
+        'destination' => [
+
+            'latitude' =>
+                $destLat,
+
+            'longitude' =>
+                $destLon,
+
+            'snap_latitude' =>
+                $endSnap['latitude'],
+
+            'snap_longitude' =>
+                $endSnap['longitude'],
+
+        ],
+
+
+        // =================================================
+        // ROUTE PATH
+        // =================================================
+
+        'route_path' =>
+            $routePath,
+
+
+        // =================================================
+        // DISTANCE
+        // =================================================
+
+        'distance_nm' =>
+            round(
+                $distanceNm,
+                2
+            ),
+
+
+        // =================================================
+        // INITIAL SPEED
+        // =================================================
+
+        'speed_knots' =>
+            round(
+                $speedKnots,
+                2
+            ),
+
+
+        // =================================================
+        // TRAVEL TIME
+        // =================================================
+
+        'travel_hours' =>
+            round(
+                $travelHours,
+                4
+            ),
+
+        'travel_seconds' =>
+            $travelSeconds,
+
+        'duration' =>
+            $duration,
+
+
+        // =================================================
+        // ETA
+        // =================================================
+
+        'start_time' =>
+            $startTime->format(
+                'Y-m-d H:i:s'
+            ),
+
+        'eta' =>
+            $eta->format(
+                'Y-m-d H:i:s'
+            ),
+
+        'eta_formatted' =>
+            $eta->format(
+                'd-m-Y H:i:s'
+            ),
+
+    ]);
+}
 }
