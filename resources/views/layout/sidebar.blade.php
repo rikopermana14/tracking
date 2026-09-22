@@ -85,7 +85,7 @@
           <a href="/track-ship/route-estimation" class="nav-link">
             <i class="nav-icon fas fa-cart-plus"></i>
             <p>
-              Inventory
+              route-estimation
             </p>
           </a>
         </li>

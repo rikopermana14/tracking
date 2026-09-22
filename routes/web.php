@@ -86,6 +86,12 @@ Route::post(
     [HomeController::class, 'calculateRouteEstimation']
 )->name('track-ship.calculate-route-estimation');
 
+Route::get(
+    '/track-ship/route-estimation-history',
+    [HomeController::class, 'routeEstimationHistory']
+)->name('track-ship.route-estimation-history');
+
+
     Route::get(
     '/track-ship/historical-last-positions',
     [HomeController::class, 'historicalLastPositions']

@@ -55,6 +55,39 @@ public function routeEstimationPage()
 
     return view('routes.route-estimation', compact('ships'));
 }
+
+// =====================================================
+// GET HISTORY POINTS FOR ROUTE ESTIMATION
+// =====================================================
+
+public function routeEstimationHistory(Request $request)
+{
+    $request->validate([
+        'ship_name' => 'required|string',
+    ]);
+
+    $shipName = $request->ship_name;
+
+    $history = ships::where('vname', $shipName)
+        ->whereNotNull('latitude')
+        ->whereNotNull('longitude')
+        ->orderBy('datetime_utc', 'asc')
+        ->get([
+            'id',
+            'vname',
+            'latitude',
+            'longitude',
+            'speed',
+            'mileage',
+            'status',
+            'datetime_utc',
+        ]);
+
+    return response()->json([
+        'success' => true,
+        'data' => $history,
+    ]);
+}
     
 // ================== ROUTE PLANNER ==================
 
@@ -680,27 +713,30 @@ private function calculateRouteDistanceNm($points)
         return redirect()->route('user')->with('success', 'User deleted successfully.');
     }
 
-    // ================== CALCULATE ROUTE ESTIMATION ==================
-
-// ================== CALCULATE ROUTE ESTIMATION ==================
+   // ================== CALCULATE ROUTE ESTIMATION ==================
 
 public function calculateRouteEstimation(Request $request)
 {
     // =====================================================
-    // 1. VALIDASI INPUT
+    // 1. VALIDASI
     // =====================================================
 
     $request->validate([
-        'ship_id'  => 'required',
+        'ship_id' => 'required',
+
         'ship_lat' => 'required|numeric',
         'ship_lon' => 'required|numeric',
+
         'dest_lat' => 'required|numeric',
         'dest_lon' => 'required|numeric',
+
+        'start_history_id' => 'nullable|integer',
+        'destination_history_id' => 'nullable|integer',
     ]);
 
 
     // =====================================================
-    // 2. AMBIL INPUT
+    // 2. INPUT
     // =====================================================
 
     $shipId = $request->ship_id;
@@ -711,12 +747,19 @@ public function calculateRouteEstimation(Request $request)
     $destLat = (float) $request->dest_lat;
     $destLon = (float) $request->dest_lon;
 
+    $startHistoryId =
+        $request->start_history_id;
+
+    $destinationHistoryId =
+        $request->destination_history_id;
+
 
     // =====================================================
-    // 3. AMBIL DATA KAPAL
+    // 3. IDENTITAS KAPAL
     // =====================================================
 
-    $selectedShip = ships::find($shipId);
+    $selectedShip =
+        ships::find($shipId);
 
     if (!$selectedShip) {
 
@@ -727,86 +770,132 @@ public function calculateRouteEstimation(Request $request)
 
     }
 
-    $shipName = $selectedShip->vname;
+    $shipName =
+        $selectedShip->vname;
 
 
     // =====================================================
-    // 4. CARI DATA HISTORY KAPAL
-    //    BERDASARKAN POSISI START TERDEKAT
-    // =====================================================
-
-    $shipHistory = ships::where(
-            'vname',
-            $shipName
-        )
-        ->whereNotNull('latitude')
-        ->whereNotNull('longitude')
-        ->get();
-
-
-    if ($shipHistory->isEmpty()) {
-
-        return response()->json([
-            'success' => false,
-            'message' =>
-                'No historical position found for this vessel.'
-        ], 404);
-
-    }
-
-
-    // =====================================================
-    // 5. CARI RECORD HISTORY PALING DEKAT
-    //    DENGAN POSISI START
+    // 4. TENTUKAN INITIAL HISTORY
     // =====================================================
 
     $nearestHistory = null;
 
-    $nearestDistance = PHP_FLOAT_MAX;
+    $nearestDistance = null;
 
 
-    foreach ($shipHistory as $history) {
+    // =====================================================
+    // 4A. JIKA START DIPILIH DARI HISTORY
+    // =====================================================
 
-        $distanceKm =
+    if ($startHistoryId) {
+
+        $nearestHistory =
+            ships::where('id', $startHistoryId)
+                ->where('vname', $shipName)
+                ->whereNotNull('latitude')
+                ->whereNotNull('longitude')
+                ->first();
+
+
+        if (!$nearestHistory) {
+
+            return response()->json([
+                'success' => false,
+                'message' =>
+                    'Selected start history was not found.'
+            ], 404);
+
+        }
+
+
+        $nearestDistance =
             $this->haversineGreatCircleDistance(
 
                 $shipLat,
                 $shipLon,
 
-                (float) $history->latitude,
-                (float) $history->longitude
+                (float) $nearestHistory->latitude,
+                (float) $nearestHistory->longitude
 
             );
 
 
-        if ($distanceKm < $nearestDistance) {
+    // =====================================================
+    // 4B. JIKA START DIINPUT MANUAL
+    // =====================================================
 
-            $nearestDistance =
-                $distanceKm;
+    } else {
 
-            $nearestHistory =
-                $history;
+        $shipHistory =
+            ships::where(
+                'vname',
+                $shipName
+            )
+            ->whereNotNull('latitude')
+            ->whereNotNull('longitude')
+            ->get();
+
+
+        if ($shipHistory->isEmpty()) {
+
+            return response()->json([
+                'success' => false,
+                'message' =>
+                    'No historical position found for this vessel.'
+            ], 404);
+
+        }
+
+
+        $nearestDistance =
+            PHP_FLOAT_MAX;
+
+
+        foreach ($shipHistory as $history) {
+
+            $distanceKm =
+                $this->haversineGreatCircleDistance(
+
+                    $shipLat,
+                    $shipLon,
+
+                    (float) $history->latitude,
+                    (float) $history->longitude
+
+                );
+
+
+            if (
+                $distanceKm <
+                $nearestDistance
+            ) {
+
+                $nearestDistance =
+                    $distanceKm;
+
+                $nearestHistory =
+                    $history;
+
+            }
+
+        }
+
+
+        if (!$nearestHistory) {
+
+            return response()->json([
+                'success' => false,
+                'message' =>
+                    'Unable to determine initial vessel position.'
+            ], 404);
 
         }
 
     }
 
 
-    if (!$nearestHistory) {
-
-        return response()->json([
-            'success' => false,
-            'message' =>
-                'Unable to determine initial vessel position.'
-        ], 404);
-
-    }
-
-
     // =====================================================
-    // 6. INITIAL SPEED
-    //
-    // SPEED DIAMBIL DARI RECORD HISTORY TERDEKAT
+    // 5. INITIAL SPEED
     // =====================================================
 
     $speedKnots =
@@ -816,10 +905,6 @@ public function calculateRouteEstimation(Request $request)
     $historicalStartTime =
         $nearestHistory->datetime_utc;
 
-
-    // =====================================================
-    // VALIDASI SPEED
-    // =====================================================
 
     if ($speedKnots <= 0) {
 
@@ -847,7 +932,7 @@ public function calculateRouteEstimation(Request $request)
                 'datetime_utc' =>
                     $nearestHistory->datetime_utc,
 
-            ],
+            ]
 
         ], 422);
 
@@ -855,13 +940,7 @@ public function calculateRouteEstimation(Request $request)
 
 
     // =====================================================
-    // 7. CARI ROUTE TERBAIK
-    //
-    // START + DESTINATION
-    //        ↓
-    // findBestRoute()
-    //        ↓
-    // ROUTE OTOMATIS
+    // 6. CARI ROUTE TERBAIK
     // =====================================================
 
     $bestRoute =
@@ -888,7 +967,7 @@ public function calculateRouteEstimation(Request $request)
 
 
     // =====================================================
-    // 8. AMBIL DATA ROUTE
+    // 7. DATA ROUTE
     // =====================================================
 
     $route =
@@ -905,8 +984,7 @@ public function calculateRouteEstimation(Request $request)
 
 
     // =====================================================
-    // 9. POSISI START DAN DESTINATION
-    //    PADA ROUTE
+    // 8. POSISI PADA ROUTE
     // =====================================================
 
     $startPos =
@@ -922,23 +1000,13 @@ public function calculateRouteEstimation(Request $request)
 
 
     // =====================================================
-    // 10. BANGUN ROUTE PATH
-    //
-    // START SNAP
-    //      ↓
-    // WAYPOINT
-    //      ↓
-    // WAYPOINT
-    //      ↓
-    // DESTINATION SNAP
+    // 9. BANGUN ROUTE PATH
     // =====================================================
 
     $routePath = [];
 
 
-    // =====================================================
-    // START SNAP
-    // =====================================================
+    // START
 
     $routePath[] = [
 
@@ -1042,9 +1110,7 @@ public function calculateRouteEstimation(Request $request)
     }
 
 
-    // =====================================================
-    // DESTINATION SNAP
-    // =====================================================
+    // DESTINATION
 
     $routePath[] = [
 
@@ -1061,7 +1127,7 @@ public function calculateRouteEstimation(Request $request)
 
 
     // =====================================================
-    // 11. HITUNG JARAK ROUTE
+    // 10. HITUNG JARAK
     // =====================================================
 
     $distanceNm =
@@ -1071,25 +1137,13 @@ public function calculateRouteEstimation(Request $request)
 
 
     // =====================================================
-    // 12. HITUNG WAKTU ESTIMASI
-    //
-    // Rumus:
-    //
-    // T = D / V
-    //
-    // D = nautical mile
-    // V = knot
-    // T = jam
+    // 11. HITUNG WAKTU
     // =====================================================
 
     $travelHours =
         $distanceNm /
         $speedKnots;
 
-
-    // =====================================================
-    // 13. KONVERSI JAM KE DETIK
-    // =====================================================
 
     $travelSeconds =
         (int) round(
@@ -1098,7 +1152,7 @@ public function calculateRouteEstimation(Request $request)
 
 
     // =====================================================
-    // 14. FORMAT DURASI
+    // 12. FORMAT DURASI
     // =====================================================
 
     $days =
@@ -1133,10 +1187,6 @@ public function calculateRouteEstimation(Request $request)
     $seconds =
         $remainingSeconds % 60;
 
-
-    // =====================================================
-    // 15. FORMAT DURASI UNTUK VIEW
-    // =====================================================
 
     $durationParts = [];
 
@@ -1186,20 +1236,19 @@ public function calculateRouteEstimation(Request $request)
 
 
     // =====================================================
-    // 16. WAKTU MULAI ESTIMASI
+    // 13. WAKTU MULAI
     //
-    // UNTUK MODE ESTIMATION:
-    // menggunakan waktu saat perhitungan dilakukan.
-    //
-    // HISTORY TETAP DISIMPAN SEBAGAI REFERENSI
+    // MENGGUNAKAN WAKTU HISTORY START
     // =====================================================
 
     $startTime =
-    Carbon::parse($historicalStartTime);
+        Carbon::parse(
+            $historicalStartTime
+        );
 
 
     // =====================================================
-    // 17. HITUNG ETA
+    // 14. ETA
     // =====================================================
 
     $eta =
@@ -1211,7 +1260,7 @@ public function calculateRouteEstimation(Request $request)
 
 
     // =====================================================
-    // 18. RESPONSE
+    // 15. RESPONSE
     // =====================================================
 
     return response()->json([
@@ -1220,7 +1269,7 @@ public function calculateRouteEstimation(Request $request)
 
 
         // =================================================
-        // HISTORY YANG DIGUNAKAN UNTUK INITIAL SPEED
+        // HISTORY START
         // =================================================
 
         'historical_start' => [
@@ -1249,6 +1298,14 @@ public function calculateRouteEstimation(Request $request)
                 ),
 
         ],
+
+
+        // =================================================
+        // DESTINATION HISTORY
+        // =================================================
+
+        'historical_destination_id' =>
+            $destinationHistoryId,
 
 
         // =================================================
@@ -1349,7 +1406,7 @@ public function calculateRouteEstimation(Request $request)
 
 
         // =================================================
-        // INITIAL SPEED
+        // SPEED
         // =================================================
 
         'speed_knots' =>
@@ -1360,7 +1417,7 @@ public function calculateRouteEstimation(Request $request)
 
 
         // =================================================
-        // TRAVEL TIME
+        // TIME
         // =================================================
 
         'travel_hours' =>
@@ -1377,13 +1434,18 @@ public function calculateRouteEstimation(Request $request)
 
 
         // =================================================
-        // ETA
+        // TIME START
         // =================================================
 
         'start_time' =>
             $startTime->format(
                 'Y-m-d H:i:s'
             ),
+
+
+        // =================================================
+        // ETA
+        // =================================================
 
         'eta' =>
             $eta->format(
