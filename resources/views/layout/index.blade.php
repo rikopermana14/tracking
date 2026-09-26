@@ -5,7 +5,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="icon" href="{{ asset('logo/logo-logindo.png') }}">
-    <title>Vessel Daily Report</title>
+    <title>Monitoring System</title>
 <meta name="csrf-token" content="{{ csrf_token() }}">
     <!-- Google Font: Source Sans Pro -->
     <link rel="stylesheet"
@@ -205,8 +205,235 @@
                     // Mengatur lebar kolom keempat dan lainnya sesuai kebutuhan
                 ],
 
-                "dom": 'Bfrtip',
-                "buttons": ["copy", "csv", "excel", "pdf", "print", "colvis"],
+               "dom": 'Bfrtip',
+
+"buttons": [
+    "copy",
+    "csv",
+    {
+        extend: 'excelHtml5',
+        text: 'Excel',
+        title: 'Historical Route Vessel',
+
+        messageTop: function () {
+
+            var shipName = $('#ship-name').val();
+
+            if (!shipName) {
+                shipName = 'Semua Kapal';
+            }
+
+            return 'Vessel: ' + shipName;
+        },
+
+        messageBottom: function () {
+
+            var exportedBy =
+                @json(auth()->user()->name ?? 'User');
+
+            var now = new Date();
+
+            var bulanIndonesia = [
+                'Januari',
+                'Februari',
+                'Maret',
+                'April',
+                'Mei',
+                'Juni',
+                'Juli',
+                'Agustus',
+                'September',
+                'Oktober',
+                'November',
+                'Desember'
+            ];
+
+            var tanggal =
+                now.getDate() + ' ' +
+                bulanIndonesia[now.getMonth()] + ' ' +
+                now.getFullYear();
+
+            return [
+                '',
+                'Jakarta, ' + tanggal,
+                'Exported by: ' + exportedBy
+            ].join('\n');
+        }
+    },
+    {
+        extend: 'pdfHtml5',
+
+        text: 'PDF',
+
+        title: 'Historical Route Vessel',
+
+        orientation: 'landscape',
+
+        pageSize: 'A4',
+
+        customize: function (doc) {
+
+            // =================================================
+            // NAMA USER YANG SEDANG LOGIN
+            // =================================================
+
+            var exportedBy =
+                @json(auth()->user()->name ?? 'User');
+
+
+            // =================================================
+            // TANGGAL EXPORT
+            // =================================================
+
+            var now = new Date();
+
+            var bulanIndonesia = [
+                'Januari',
+                'Februari',
+                'Maret',
+                'April',
+                'Mei',
+                'Juni',
+                'Juli',
+                'Agustus',
+                'September',
+                'Oktober',
+                'November',
+                'Desember'
+            ];
+
+            var tanggal =
+                now.getDate() +
+                ' ' +
+                bulanIndonesia[now.getMonth()] +
+                ' ' +
+                now.getFullYear();
+
+
+            // =================================================
+            // NAMA KAPAL
+            // =================================================
+
+            var shipName =
+                $('#ship-name').val();
+
+            if (!shipName) {
+                shipName = 'Semua Kapal';
+            }
+
+
+            // =================================================
+            // TAMBAHKAN INFORMASI KAPAL
+            // =================================================
+
+            doc.content.splice(1, 0, {
+
+                text: 'Vessel: ' + shipName,
+
+                fontSize: 10,
+
+                margin: [
+                    0,
+                    0,
+                    0,
+                    10
+                ]
+
+            });
+
+
+            // =================================================
+            // FOOTER
+            // =================================================
+
+            doc.footer = function (
+                currentPage,
+                pageCount
+            ) {
+
+                return {
+
+                    columns: [
+
+                        {
+                            text:
+                                'Historical Route Vessel',
+                            alignment: 'left',
+                            fontSize: 8
+                        },
+
+                        {
+                            text:
+                                'Page ' +
+                                currentPage +
+                                ' of ' +
+                                pageCount,
+                            alignment: 'right',
+                            fontSize: 8
+                        }
+
+                    ],
+
+                    margin: [
+                        30,
+                        0,
+                        30,
+                        10
+                    ]
+
+                };
+
+            };
+
+
+            // =================================================
+            // TANDA TANGAN / INFORMASI EXPORT
+            // =================================================
+
+            doc.content.push({
+
+                margin: [
+                    0,
+                    30,
+                    0,
+                    0
+                ],
+
+                alignment: 'right',
+
+                stack: [
+
+                    {
+                        text:
+                            'Jakarta, ' + tanggal,
+
+                        fontSize: 10,
+
+                        margin: [
+                            0,
+                            0,
+                            0,
+                            20
+                        ]
+                    },
+
+                    {
+                        text:
+                            exportedBy,
+
+                        fontSize: 10
+                    }
+
+                ]
+
+            });
+
+        }
+    },
+
+    "print",
+    "colvis"
+],
                 "initComplete": function () {
                     var $buttons = $('.dt-buttons').hide();
                     $('#exportLink').on('change', function () {
@@ -221,84 +448,36 @@
 
         });
 
-        function exportAllTablesToPDF() {
-            var doc = new jsPDF();
+        
+// =====================================================
+// DATE RANGE FILTER
+// =====================================================
 
-            // Loop melalui semua tabel dan ekspor masing-masing ke PDF
-            var tables = [table1, table2, table3, table4, table5, table6,tabel9,
-            table7]; // Ganti dengan semua tabel yang Anda inisialisasi
-            var startY = 10;
+$('#date-range').daterangepicker({
 
-            tables.forEach(function (table, index) {
-                // Tambahkan judul tabel ke PDF
-                doc.setFontSize(16);
-                doc.text('Table ' + (index + 1), 10, startY);
+    startDate: '2023-01-01',
 
-                // Tambahkan tabel ke PDF
-                startY += 20; // Geser ke bawah untuk tabel berikutnya
-                doc.autoTable({
-                    html: '#' + table.table().node().id, // Menggunakan ID tabel saat ini
-                    startY: startY
-                });
+    endDate: '2023-12-31',
 
-                // Tambahkan spasi antara tabel
-                startY += table.rows().count() * 7; // Menggunakan perkiraan tinggi tabel sebagai spasi
-            });
+    opens: 'left',
 
-            // Simpan file PDF
-            doc.save('All_Tables.pdf');
-        }
+    locale: {
+        format: 'YYYY-MM-DD'
+    }
 
-        // Tambahkan event handler ke tombol "Export All Tables to PDF"
-        $('#export-all-tables-pdf-button').on('click', exportAllTablesToPDF);
+}, function (start, end, label) {
 
-        $('#date-range').daterangepicker({
-            startDate: '2023-01-01',
-            endDate: '2023-12-31',
-            opens: 'left',
-            locale: {
-                format: 'YYYY-MM-DD'
-            }
-        }, function (start, end, label) {
-            // Menyaring data tabel berdasarkan rentang tanggal yang dipilih
-            table1.columns(0).search(start.format('YYYY-MM-DD') + '|' + end.format('YYYY-MM-DD')).draw();
-        });
+    // Filter DataTable berdasarkan tanggal
+    table1
+        .columns(1)
+        .search(
+            start.format('YYYY-MM-DD') +
+            '|' +
+            end.format('YYYY-MM-DD')
+        )
+        .draw();
 
-        function combineTableData() {
-            var combinedData = [];
-            combinedData = combinedData.concat(table2.rows().data().toArray());
-            return combinedData;
-        }
-
-        function combineTableConsumption() {
-            var combinedData = [];
-            combinedData = combinedData.concat(table3.rows().data().toArray());
-            return combinedData;
-        }
-
-        function combineTableRunning() {
-            var combinedData = [];
-            combinedData = combinedData.concat(table4.rows().data().toArray());
-            return combinedData;
-        }
-
-        function combineTablePayload() {
-            var combinedData = [];
-            combinedData = combinedData.concat(table5.rows().data().toArray());
-            return combinedData;
-        }
-
-        function combineTableStock() {
-            var combinedData = [];
-            combinedData = combinedData.concat(table6.rows().data().toArray());
-            return combinedData;
-        }
-
-        function combineTablegeneral() {
-            var combinedData = [];
-            combinedData = combinedData.concat(table7.rows().data().toArray());
-            return combinedData;
-        }
+});
 
 
         // Function untuk mengekspor data ke Excel
@@ -810,7 +989,7 @@
                 var url = URL.createObjectURL(blob);
                 var a = document.createElement('a');
                 a.href = url;
-                a.download = 'Vessel Daily Report.xlsx';
+                a.download = 'Historical Route Vessel.xlsx';
                 a.click();
             });
         }

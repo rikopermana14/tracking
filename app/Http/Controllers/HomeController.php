@@ -99,18 +99,27 @@ public function generateRoute(Request $request)
     $destLat = (float) $request->dest_lat;
     $destLon = (float) $request->dest_lon;
 
-    $bestRoute = $this->findBestRoute(
-        $shipLat,
-        $shipLon,
-        $destLat,
-        $destLon
-    );
+   $corridorNm = (float) $request->input(
+    'corridor_nm',
+    5
+);
 
-    if (!$bestRoute) {
-        return response()->json([
-            'error' => 'No route found'
-        ], 404);
-    }
+$bestRoute = $this->findBestRoute(
+    $shipLat,
+    $shipLon,
+    $destLat,
+    $destLon,
+    $corridorNm,
+    false
+);
+
+   if (!$bestRoute) {
+    return response()->json([
+        'success' => false,
+        'message' =>
+            "Tidak ditemukan route dalam corridor {$corridorNm} NM."
+    ], 422);
+}
 
     $route = $bestRoute['route'];
     $waypoints = $bestRoute['waypoints'];
@@ -285,15 +294,32 @@ private function findNearestRoute($lat,$lon)
     return $bestRoute;
 }
 
-private function findBestRoute($shipLat,$shipLon,$destLat,$destLon)
-{
+private function findBestRoute(
+    $shipLat,
+    $shipLon,
+    $destLat,
+    $destLon,
+    $corridorNm = 5,
+    $enforceCorridor = true
+) {
+    // =====================================================
+    // CORRIDOR
+    // =====================================================
+
+    // 1 NM = 1.852 KM
+    $corridorKm = $corridorNm * 1.852;
+
     $routes = Route::all();
 
     $bestRoute = null;
     $bestScore = PHP_FLOAT_MAX;
 
-    foreach ($routes as $route)
-    {
+    foreach ($routes as $route) {
+
+        // =================================================
+        // AMBIL WAYPOINT ROUTE
+        // =================================================
+
         $wps = RouteWaypoint::where(
             'route_id',
             $route->id
@@ -301,9 +327,14 @@ private function findBestRoute($shipLat,$shipLon,$destLat,$destLon)
         ->orderBy('sequence')
         ->get();
 
+        // Route harus memiliki minimal 2 waypoint
         if ($wps->count() < 2) {
             continue;
         }
+
+        // =================================================
+        // CARI SNAP START
+        // =================================================
 
         $shipSnap = $this->findNearestPointOnRoute(
             $wps,
@@ -311,26 +342,64 @@ private function findBestRoute($shipLat,$shipLon,$destLat,$destLon)
             $shipLon
         );
 
+        // =================================================
+        // CARI SNAP DESTINATION
+        // =================================================
+
         $destSnap = $this->findNearestPointOnRoute(
             $wps,
             $destLat,
             $destLon
         );
 
+        // Pastikan snap ditemukan
+        if (!$shipSnap || !$destSnap) {
+            continue;
+        }
+
+        // =================================================
+        // CORRIDOR CHECK
+        // =================================================
+
+        if ($enforceCorridor) {
+
+            // START harus berada maksimal dalam corridor
+            if ($shipSnap['distance_km'] > $corridorKm) {
+                continue;
+            }
+
+            // DESTINATION juga harus berada maksimal dalam corridor
+            if ($destSnap['distance_km'] > $corridorKm) {
+                continue;
+            }
+        }
+
+        // =================================================
+        // SCORE
+        // =================================================
+
+        // Semakin kecil berarti semakin dekat
+        // dengan route pada START dan DESTINATION.
         $score =
-            $shipSnap['distance_km']
-            +
+            $shipSnap['distance_km'] +
             $destSnap['distance_km'];
 
-        if ($score < $bestScore)
-        {
+        // =================================================
+        // PILIH ROUTE TERBAIK
+        // =================================================
+
+        if ($score < $bestScore) {
+
             $bestScore = $score;
 
             $bestRoute = [
-                'route' => $route,
-                'waypoints' => $wps,
-                'shipSnap' => $shipSnap,
-                'destSnap' => $destSnap
+                'route'      => $route,
+                'waypoints'  => $wps,
+                'shipSnap'   => $shipSnap,
+                'destSnap'   => $destSnap,
+                'score'      => $score,
+                'corridor_nm'=> $corridorNm,
+                'corridor_km'=> $corridorKm
             ];
         }
     }
@@ -943,27 +1012,34 @@ public function calculateRouteEstimation(Request $request)
     // 6. CARI ROUTE TERBAIK
     // =====================================================
 
-    $bestRoute =
-        $this->findBestRoute(
+    $corridorNm = (float) $request->input(
+    'corridor_nm',
+    5
+);
 
-            $shipLat,
-            $shipLon,
+$bestRoute =
+    $this->findBestRoute(
 
-            $destLat,
-            $destLon
+        $shipLat,
+        $shipLon,
 
-        );
+        $destLat,
+        $destLon,
+
+        $corridorNm
+
+    );
 
 
     if (!$bestRoute) {
 
-        return response()->json([
-            'success' => false,
-            'message' =>
-                'No suitable route found.'
-        ], 404);
+    return response()->json([
+        'success' => false,
+        'message' =>
+            "Tidak ditemukan route yang sesuai dalam corridor {$corridorNm} NM."
+    ], 422);
 
-    }
+}
 
 
     // =====================================================

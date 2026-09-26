@@ -172,7 +172,9 @@
      ========================================== -->
 <div class="mt-3">
 
-    <h5>Hasil Data Filter</h5>
+    <h5 id="result-title">
+    Hasil Data Filter
+</h5>
 
     <div class="table-responsive">
 
@@ -911,21 +913,72 @@ function loadHistoricalVessels() {
                 // FOCUS KE KAPAL DI MAP
                 // ==========================================
 
-                col.addEventListener(
-                    'click',
-                    function () {
+                // ==========================================
+// KETIKA CARD DIKLIK
+// FILTER DATA BERDASARKAN KAPAL
+// ==========================================
 
-                        map.flyTo(
-                            [pos.latitude, pos.longitude],
-                            10,
-                            {
-                                animate: true,
-                                duration: 1.5
-                            }
-                        );
+col.addEventListener(
+    'click',
+    function () {
 
-                    }
-                );
+        console.log(
+            'Kapal dipilih:',
+            vesselName
+        );
+
+document.getElementById('result-title').innerText =
+    `Data History - ${vesselName}`;
+        // =================================================
+        // PILIH NAMA KAPAL DI DROPDOWN
+        // =================================================
+
+        const shipSelect =
+            document.getElementById('ship-name');
+
+        if (shipSelect) {
+
+            shipSelect.value = vesselName;
+
+        }
+
+
+        // =================================================
+        // FILTER DATA KAPAL
+        // =================================================
+
+        filterByDate();
+
+
+        // =================================================
+        // FOCUS KE POSISI TERAKHIR KAPAL
+        // =================================================
+
+        const lat =
+            parseFloat(pos.latitude);
+
+        const lon =
+            parseFloat(pos.longitude);
+
+
+        if (
+            !Number.isNaN(lat) &&
+            !Number.isNaN(lon)
+        ) {
+
+            map.flyTo(
+                [lat, lon],
+                10,
+                {
+                    animate: true,
+                    duration: 1.5
+                }
+            );
+
+        }
+
+    }
+);
 
                 // ==========================================
                 // REVERSE GEOCODING

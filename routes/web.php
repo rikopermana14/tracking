@@ -70,6 +70,12 @@ Route::middleware(['web', 'auth'])->group(function () {
     ])->name('routes.store');
     });
 
+    // Update route dan waypoint
+Route::put('/routes/{route}', [
+    RouteController::class,
+    'update'
+])->name('routes.update');
+
 
     // =====================================================
     // ADMIN + OPERATOR

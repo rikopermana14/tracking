@@ -83,9 +83,9 @@
         @if (auth()->user()->hasRole('admin')|| auth()->user()->hasRole('operator'))
         <li class="nav-item">
           <a href="/track-ship/route-estimation" class="nav-link">
-            <i class="nav-icon fas fa-cart-plus"></i>
+            <i class="nav-icon fas fa-calculator"></i>
             <p>
-              route-estimation
+              Route Estimation
             </p>
           </a>
         </li>

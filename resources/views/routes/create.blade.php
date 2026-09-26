@@ -293,12 +293,13 @@ let routePolyline = null;
 // ROUTE YANG SUDAH ADA DI DATABASE
 // =========================================================
 
-// Menyimpan layer route existing yang sedang ditampilkan.
 let existingRouteLayers = {};
-
-
-// Menyimpan marker waypoint existing.
 let existingWaypointLayers = {};
+
+let selectedRouteId = null;
+let selectedRoute = null;
+let selectedRoutePolyline = null;
+let selectedRouteMarkers = [];
 
 
 // =========================================================
@@ -343,6 +344,12 @@ function createWaypointIcon(sequence) {
 // =========================================================
 
 routeMap.on('click', function(e) {
+
+    // Kalau sedang memilih/edit route existing,
+    // klik kosong pada map tidak menambah waypoint.
+    if (selectedRouteId !== null) {
+        return;
+    }
 
     addWaypoint(
         e.latlng.lat,
@@ -560,27 +567,324 @@ function renumberWaypoints() {
 // MENAMPILKAN SELURUH ROUTE YANG SUDAH ADA
 // =========================================================
 
+// =========================================================
+// MENAMPILKAN ROUTE EXISTING
+// =========================================================
+
 function displayExistingRoutes() {
 
-    // Pastikan tidak ada route existing lama
-    // yang masih tertinggal di map.
-    Object.values(existingRouteLayers).forEach(
-        function(layer) {
+    // Hapus semua layer route lama
+    Object.values(existingRouteLayers).forEach(function(layer) {
 
+        if (routeMap.hasLayer(layer)) {
             routeMap.removeLayer(layer);
+        }
+
+    });
+
+
+    // Hapus semua marker waypoint lama
+    Object.values(existingWaypointLayers).forEach(function(markers) {
+
+        markers.forEach(function(marker) {
+
+            if (routeMap.hasLayer(marker)) {
+                routeMap.removeLayer(marker);
+            }
+
+        });
+
+    });
+
+
+    existingRouteLayers = {};
+    existingWaypointLayers = {};
+
+
+    // =====================================================
+    // TAMPILKAN SEMUA ROUTE
+    // =====================================================
+
+    existingRoutes.forEach(function(route) {
+
+        console.log(
+            'LOAD ROUTE:',
+            route.id,
+            route.route_name
+        );
+
+
+        if (
+            !route.waypoints ||
+            route.waypoints.length < 2
+        ) {
+            return;
+        }
+
+
+        // =================================================
+        // KOORDINAT
+        // =================================================
+
+        const coordinates =
+            route.waypoints.map(function(point) {
+
+                return [
+                    parseFloat(point.latitude),
+                    parseFloat(point.longitude)
+                ];
+
+            });
+
+
+        // =================================================
+        // POLYLINE
+        // =================================================
+
+        const routeLayer =
+            L.polyline(
+                coordinates,
+                {
+                    color: '#777',
+                    weight: 3,
+                    opacity: 0.5
+                }
+            ).addTo(routeMap);
+
+
+        // PENTING:
+        // Laravel Route model menggunakan "id"
+        existingRouteLayers[route.id] =
+            routeLayer;
+
+
+        // =================================================
+        // KLIK ROUTE
+        // =================================================
+
+        routeLayer.on('click', function(e) {
+
+            L.DomEvent.stopPropagation(e);
+
+            console.log(
+                'CLICK ROUTE:',
+                route.id,
+                route.route_name
+            );
+
+            selectExistingRoute(
+                route.id
+            );
+
+        });
+
+
+        // =================================================
+        // MARKER WAYPOINT EXISTING
+        // =================================================
+
+        const markers = [];
+
+
+        route.waypoints.forEach(function(point) {
+
+            const marker =
+                L.circleMarker(
+                    [
+                        parseFloat(point.latitude),
+                        parseFloat(point.longitude)
+                    ],
+                    {
+                        color: '#555',
+                        fillColor: '#fff',
+                        fillOpacity: 1,
+                        radius: 4,
+                        weight: 1
+                    }
+                ).addTo(routeMap);
+
+
+            marker.bindTooltip(
+                `${route.route_name} - WP ${point.sequence}`,
+                {
+                    direction: 'top'
+                }
+            );
+
+
+            // Klik waypoint
+            marker.on('click', function(e) {
+
+                L.DomEvent.stopPropagation(e);
+
+                console.log(
+                    'CLICK WAYPOINT:',
+                    route.id,
+                    route.route_name
+                );
+
+                selectExistingRoute(
+                    route.id
+                );
+
+            });
+
+
+            markers.push(marker);
+
+        });
+
+
+        existingWaypointLayers[
+            route.id
+        ] = markers;
+
+    });
+
+}
+// =========================================================
+// PILIH SATU ROUTE UNTUK DIEDIT
+// =========================================================
+
+function selectExistingRoute(routeId) {
+
+    console.log(
+        'SELECT ROUTE ID:',
+        routeId
+    );
+
+
+    // =====================================================
+    // CARI ROUTE
+    // =====================================================
+
+    const route =
+        existingRoutes.find(function(item) {
+
+            return parseInt(item.id) ===
+                   parseInt(routeId);
+
+        });
+
+
+    // =====================================================
+    // JIKA TIDAK DITEMUKAN
+    // =====================================================
+
+    if (!route) {
+
+        console.error(
+            'Route tidak ditemukan:',
+            routeId
+        );
+
+        console.log(
+            'Available routes:',
+            existingRoutes
+        );
+
+        return;
+    }
+
+
+    console.log(
+        'ROUTE TERPILIH:',
+        route.id,
+        route.route_name
+    );
+
+
+   // =====================================================
+// SIMPAN ROUTE AKTIF
+// =====================================================
+
+selectedRouteId = route.id;
+selectedRoute = route;
+
+
+// =====================================================
+// ACTIVE BUTTON
+// =====================================================
+
+document.querySelectorAll('.existing-route-btn').forEach(function(button) {
+
+    button.classList.remove('active');
+
+});
+
+const selectedButton =
+    document.querySelector(
+        `.existing-route-btn[data-route-id="${route.id}"]`
+    );
+
+if (selectedButton) {
+    selectedButton.classList.add('active');
+}
+    // =====================================================
+    // HILANGKAN ROUTE LAIN
+    // =====================================================
+
+    Object.keys(existingRouteLayers).forEach(
+        function(id) {
+
+            const layer =
+                existingRouteLayers[id];
+
+
+            if (
+                parseInt(id) ===
+                parseInt(routeId)
+            ) {
+
+                // Route aktif
+                layer.setStyle({
+                    color: '#007bff',
+                    weight: 5,
+                    opacity: 1
+                });
+
+            } else {
+
+                // Route lain disembunyikan
+                if (routeMap.hasLayer(layer)) {
+
+                    routeMap.removeLayer(layer);
+
+                }
+
+            }
 
         }
     );
 
 
-    // Hapus marker waypoint existing.
-    Object.values(existingWaypointLayers).forEach(
-        function(markers) {
+    // =====================================================
+    // HILANGKAN WAYPOINT ROUTE LAIN
+    // =====================================================
 
-            markers.forEach(
+    Object.keys(existingWaypointLayers).forEach(
+        function(id) {
+
+            if (
+                parseInt(id) ===
+                parseInt(routeId)
+            ) {
+                return;
+            }
+
+
+            existingWaypointLayers[id].forEach(
                 function(marker) {
 
-                    routeMap.removeLayer(marker);
+                    if (
+                        routeMap.hasLayer(marker)
+                    ) {
+
+                        routeMap.removeLayer(
+                            marker
+                        );
+
+                    }
 
                 }
             );
@@ -589,34 +893,34 @@ function displayExistingRoutes() {
     );
 
 
-    existingRouteLayers = {};
+    // =====================================================
+    // ROUTE NAME
+    // =====================================================
 
-    existingWaypointLayers = [];
-
-
-    // =========================================================
-    // LOOP SELURUH ROUTE
-    // =========================================================
-
-    existingRoutes.forEach(
-        function(route) {
-
-            // Pastikan route memiliki waypoint.
-            if (
-                !route.waypoints ||
-                route.waypoints.length < 2
-            ) {
-
-                return;
-
-            }
+    document.getElementById(
+        'route_name'
+    ).value =
+        route.route_name;
 
 
-            // =====================================================
-            // MEMBUAT KOORDINAT POLYLINE
-            // =====================================================
+    // =====================================================
+    // LOAD WAYPOINT KE MODE EDIT
+    // =====================================================
 
-            const coordinates =
+    loadRouteForEditing(route);
+
+
+    // =====================================================
+    // ZOOM KE ROUTE
+    // =====================================================
+
+    if (
+        route.waypoints &&
+        route.waypoints.length > 0
+    ) {
+
+        const bounds =
+            L.latLngBounds(
                 route.waypoints.map(
                     function(point) {
 
@@ -626,118 +930,172 @@ function displayExistingRoutes() {
                         ];
 
                     }
-                );
-
-
-            // =====================================================
-            // MEMBUAT POLYLINE EXISTING ROUTE
-            // =====================================================
-
-            const routeLayer =
-                L.polyline(
-                    coordinates,
-                    {
-
-                        // Warna abu-abu untuk route existing.
-                        color: '#777',
-
-                        weight: 3,
-
-                        opacity: 0.6,
-
-                        // Route existing berada
-                        // di bawah route yang sedang dibuat.
-                        interactive: true
-
-                    }
-                ).addTo(routeMap);
-
-
-            // Simpan layer berdasarkan route_id.
-            existingRouteLayers[
-                route.route_id
-            ] = routeLayer;
-
-
-            // =====================================================
-            // POPUP ROUTE
-            // =====================================================
-
-            routeLayer.bindPopup(`
-                <div style="min-width:180px">
-
-                    <strong>
-                        ${route.route_name}
-                    </strong>
-
-                    <hr style="margin:5px 0">
-
-                    <div>
-                        Route ID:
-                        ${route.route_id}
-                    </div>
-
-                    <div>
-                        Waypoints:
-                        ${route.waypoints.length}
-                    </div>
-
-                </div>
-            `);
-
-
-            // =====================================================
-            // MARKER WAYPOINT EXISTING
-            // =====================================================
-
-            const markers = [];
-
-
-            route.waypoints.forEach(
-                function(point) {
-
-                    const marker =
-                        L.circleMarker(
-                            [
-                                parseFloat(point.latitude),
-                                parseFloat(point.longitude)
-                            ],
-                            {
-
-                                // Warna waypoint existing.
-                                color: '#555',
-
-                                fillColor: '#fff',
-
-                                fillOpacity: 1,
-
-                                radius: 3,
-
-                                weight: 1
-
-                            }
-                        ).addTo(routeMap);
-
-
-                    marker.bindTooltip(
-                        `${route.route_name} - WP ${point.sequence}`,
-                        {
-                            direction: 'top'
-                        }
-                    );
-
-
-                    markers.push(marker);
-
-                }
+                )
             );
 
 
-            existingWaypointLayers[
-                route.route_id
-            ] = markers;
+        routeMap.fitBounds(
+            bounds,
+            {
+                padding: [30, 30]
+            }
+        );
+
+    }
+
+}
+// =========================================================
+// LOAD ROUTE EXISTING KE MODE EDIT
+// =========================================================
+
+function loadRouteForEditing(route) {
+
+    // Hapus marker edit sebelumnya
+    waypointMarkers.forEach(function(marker) {
+
+        if (routeMap.hasLayer(marker)) {
+
+            routeMap.removeLayer(marker);
 
         }
+
+    });
+
+    waypointMarkers = [];
+
+    // Copy waypoint route
+    waypoints =
+        route.waypoints.map(function(point) {
+
+            return {
+
+                id: point.id,
+
+                sequence:
+                    parseInt(point.sequence),
+
+                latitude:
+                    parseFloat(point.latitude),
+
+                longitude:
+                    parseFloat(point.longitude),
+
+                course:
+                    point.course,
+
+                distance_nm:
+                    point.distance_nm
+
+            };
+
+        });
+
+    // =====================================================
+    // BUAT MARKER EDIT
+    // =====================================================
+
+    waypoints.forEach(function(waypoint) {
+
+        createEditableWaypointMarker(
+            waypoint
+        );
+
+    });
+
+    // =====================================================
+    // GAMBAR ROUTE
+    // =====================================================
+
+    redrawRoute();
+
+    // =====================================================
+    // UPDATE TABLE
+    // =====================================================
+
+    updateWaypointTable();
+
+    updateWaypointCount();
+
+}
+// =========================================================
+// MARKER WAYPOINT EDITABLE
+// =========================================================
+
+function createEditableWaypointMarker(waypoint) {
+
+    const marker =
+        L.marker(
+            [
+                waypoint.latitude,
+                waypoint.longitude
+            ],
+            {
+                icon:
+                    createWaypointIcon(
+                        waypoint.sequence
+                    ),
+
+                draggable: true
+            }
+        ).addTo(routeMap);
+
+    marker.bindPopup(`
+        <b>Waypoint ${waypoint.sequence}</b>
+        <br>
+        Latitude:
+        <span class="popup-lat">
+            ${waypoint.latitude.toFixed(6)}
+        </span>
+
+        <br>
+
+        Longitude:
+        <span class="popup-lon">
+            ${waypoint.longitude.toFixed(6)}
+        </span>
+    `);
+
+    // =====================================================
+    // DRAG WAYPOINT
+    // =====================================================
+
+    marker.on(
+        'dragend',
+        function(e) {
+
+            const position =
+                e.target.getLatLng();
+
+            waypoint.latitude =
+                position.lat;
+
+            waypoint.longitude =
+                position.lng;
+
+            // Update popup
+            marker.setPopupContent(`
+                <b>Waypoint ${waypoint.sequence}</b>
+                <br>
+                Latitude:
+                ${waypoint.latitude.toFixed(6)}
+
+                <br>
+
+                Longitude:
+                ${waypoint.longitude.toFixed(6)}
+            `);
+
+            // Gambar ulang route
+            redrawRoute();
+
+            // Update tabel
+            updateWaypointTable();
+
+        }
+    );
+
+    waypointMarkers.push(
+        marker
     );
 
 }
@@ -746,6 +1104,36 @@ function displayExistingRoutes() {
 // =========================================================
 
 displayExistingRoutes();
+
+// =========================================================
+// KLIK BUTTON ROUTE EXISTING
+// =========================================================
+
+document.querySelectorAll('.existing-route-btn').forEach(function(button) {
+
+    button.addEventListener('click', function() {
+
+        const routeId =
+            this.getAttribute('data-route-id');
+
+        console.log(
+            'BUTTON ROUTE DIKLIK:',
+            routeId
+        );
+
+        if (!routeId) {
+            console.error('Route ID tidak ditemukan.');
+            return;
+        }
+
+        // Pilih route
+        selectExistingRoute(
+            parseInt(routeId)
+        );
+
+    });
+
+});
 // =========================================================
 // UPDATE TABLE WAYPOINT
 // =========================================================
@@ -786,15 +1174,23 @@ function updateWaypointTable() {
 
             <td>
 
-                <button
-                    type="button"
-                    class="btn btn-danger btn-xs"
-                    onclick="deleteWaypoint(${index})"
-                >
-                    <i class="fas fa-trash"></i>
-                </button>
+    <button
+        type="button"
+        class="btn btn-primary btn-xs"
+        onclick="focusWaypoint(${index})"
+    >
+        <i class="fas fa-crosshairs"></i>
+    </button>
 
-            </td>
+    <button
+        type="button"
+        class="btn btn-danger btn-xs"
+        onclick="deleteWaypoint(${index})"
+    >
+        <i class="fas fa-trash"></i>
+    </button>
+
+</td>
 
         `;
 
@@ -805,7 +1201,30 @@ function updateWaypointTable() {
 
 }
 
+function focusWaypoint(index) {
 
+    const waypoint =
+        waypoints[index];
+
+    if (!waypoint) {
+        return;
+    }
+
+    routeMap.setView(
+        [
+            waypoint.latitude,
+            waypoint.longitude
+        ],
+        14
+    );
+
+    if (waypointMarkers[index]) {
+
+        waypointMarkers[index].openPopup();
+
+    }
+
+}
 // =========================================================
 // UPDATE JUMLAH WAYPOINT
 // =========================================================
@@ -953,9 +1372,8 @@ document.getElementById(
     }
 );
 
-
-// =========================================================
-// SIMPAN ROUTE KE DATABASE
+       // =========================================================
+// SAVE / UPDATE ROUTE
 // =========================================================
 
 document.getElementById(
@@ -969,8 +1387,6 @@ document.getElementById(
                 'route_name'
             ).value.trim();
 
-
-        // Validasi nama route.
         if (!routeName) {
 
             alert(
@@ -981,9 +1397,21 @@ document.getElementById(
 
         }
 
+        if (
+            !selectedRouteId
+        ) {
 
-        // Minimal dua waypoint.
-        if (waypoints.length < 2) {
+            alert(
+                'Silakan klik route terlebih dahulu.'
+            );
+
+            return;
+
+        }
+
+        if (
+            waypoints.length < 2
+        ) {
 
             alert(
                 'Minimal harus ada 2 waypoint.'
@@ -993,16 +1421,10 @@ document.getElementById(
 
         }
 
-
-        // =====================================================
-        // KIRIM DATA KE LARAVEL
-        // =====================================================
-
         fetch(
-            "{{ route('routes.store') }}",
+            `/routes/${selectedRouteId}`,
             {
-
-                method: 'POST',
+                method: 'PUT',
 
                 headers: {
 
@@ -1037,13 +1459,11 @@ document.getElementById(
             const data =
                 await response.json();
 
-
             if (!response.ok) {
 
                 throw data;
 
             }
-
 
             return data;
 
@@ -1052,12 +1472,11 @@ document.getElementById(
         .then(data => {
 
             alert(
-                'Route berhasil disimpan.'
+                'Route berhasil diperbarui.'
             );
 
-
             console.log(
-                'ROUTE SAVED:',
+                'ROUTE UPDATED:',
                 data
             );
 
@@ -1066,14 +1485,13 @@ document.getElementById(
         .catch(error => {
 
             console.error(
-                'Save route error:',
+                'Update route error:',
                 error
             );
 
-
             alert(
                 error.message ||
-                'Gagal menyimpan route.'
+                'Gagal memperbarui route.'
             );
 
         });
