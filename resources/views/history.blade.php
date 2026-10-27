@@ -1387,20 +1387,25 @@ function filterByDate() {
             table1.clear();
 
             let groupedByShip = {};
-            data.positions.forEach(pos => {
-                if (!groupedByShip[pos.vname]) {
-                    groupedByShip[pos.vname] = [];
-                }
-                groupedByShip[pos.vname].push(pos);
-            });
 
-            let totalDistance = 0;
+data.positions.forEach(pos => {
+    if (!groupedByShip[pos.vname]) {
+        groupedByShip[pos.vname] = [];
+    }
 
-            Object.keys(groupedByShip).forEach(ship => {
-                let positions = groupedByShip[ship];
-                let latlngs = [];
+    groupedByShip[pos.vname].push(pos);
+});
 
-                positions.forEach((position, index) => {
+let totalDistance = 0;
+
+// Nomor tabel berjalan terus untuk semua kapal
+let nomorUrutGlobal = 1;
+
+Object.keys(groupedByShip).forEach(ship => {
+    let positions = groupedByShip[ship];
+    let latlngs = [];
+
+    positions.forEach((position, index) => {
                     latlngs.push([position.latitude, position.longitude]);
 
                     let markerColor = "orange";
@@ -1433,7 +1438,7 @@ function filterByDate() {
 
                     // isi tabel
                     table1.row.add([
-                        index + 1,
+                        nomorUrutGlobal++,
                         position.datetime_utc,
                         position.vname,
                         position.latitude,
